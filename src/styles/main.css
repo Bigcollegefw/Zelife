@@ -1,0 +1,78 @@
+/* ============ 设计基准：浅色 · 日系简约 ============ */
+:root {
+  color-scheme: light; /* 锁定浅色，防止浏览器强制暗色 */
+  --bg: #FAF8F4;
+  --paper: #FFFFFF;
+  --ink: #33302B;
+  --ink-2: #8A8378;
+  --ink-3: #BBB4A7;
+  --line: #E7E1D6;
+  --mist: #F1EEE7;
+  --good: #4F7D78;
+  --bad: #AE6E62;
+  --serif: 'Songti SC', 'STSong', 'SimSun', 'Noto Serif SC', 'Source Han Serif SC', serif;
+  --sans: 'YouYuan', '幼圆', 'Hiragino Sans GB', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 15px;
+  color: var(--ink);
+  background: #ECEAE4;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.serif { font-family: var(--serif); }
+
+.shell {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100dvh;
+  background: var(--bg);
+  position: relative;
+  box-shadow: 0 0 60px rgba(60, 50, 30, 0.08);
+}
+
+/* ---- 通用元件 ---- */
+.btn {
+  font: inherit;
+  font-size: 14px;
+  letter-spacing: 0.14em;
+  cursor: pointer;
+  border: none;
+  border-radius: 3px;
+  padding: 12px 24px;
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease, transform 0.1s ease;
+}
+.btn:active { transform: scale(0.985); }
+.btn.primary { background: var(--ink); color: #FBFAF7; }
+.btn.primary:hover { background: #211E1A; }
+.btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+.btn.ghost:hover { border-color: var(--ink-2); }
+.btn.big { width: 100%; padding: 15px 24px; font-size: 15px; }
+
+.card {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 18px;
+}
+
+.delta { font-style: normal; font-weight: 600; font-variant-numeric: tabular-nums; }
+.delta.good { color: var(--good); }
+.delta.bad { color: var(--bad); }
+.delta.zero { color: var(--ink-2); }
+
+/* ---- 页面级过渡 ---- */
+.page-enter-active,
+.page-leave-active { transition: opacity 0.24s ease, transform 0.24s ease; }
+.page-enter-from { opacity: 0; transform: translateY(8px); }
+.page-leave-to { opacity: 0; transform: translateY(-6px); }
+
+/* ---- 局部浮现 ---- */
+.rise-enter-active { transition: opacity 0.35s ease, transform 0.35s ease; }
+.rise-enter-from { opacity: 0; transform: translateY(10px); }

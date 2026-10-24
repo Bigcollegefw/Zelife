@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="color-scheme" content="light" />
+<title>节点编辑器 · 交互设计稿 v2</title>
+<style>
+  :root {
+    --bg: #FAF8F4; --paper: #FFF; --ink: #33302B; --ink-2: #8A8378; --ink-3: #BBB4A7;
+    --line: #E7E1D6; --mist: #F1EEE7; --good: #4F7D78; --bad: #AE6E62;
+    --serif: 'Noto Serif SC','Source Han Serif SC','Songti SC','SimSun',serif;
+    --sans: system-ui,-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #ECEAE4; font-family: var(--sans); color: var(--ink); font-size: 14px; }
+  .phone {
+    max-width: 480px; margin: 24px auto; background: var(--bg); min-height: 90vh;
+    border-radius: 18px; box-shadow: 0 0 60px rgba(60,50,30,.12); position: relative; overflow: hidden;
+  }
+  header.bar { display: flex; align-items: center; gap: 8px; padding: 16px 18px 10px; flex-wrap: wrap; }
+  .bar-title { font-family: var(--serif); font-size: 17px; letter-spacing: .14em; margin-right: auto; }
+  .chip {
+    font-size: 11px; letter-spacing: .08em; padding: 4px 10px; border-radius: 999px;
+    background: var(--paper); border: 1px solid var(--line); color: var(--ink-2); white-space: nowrap;
+  }
+  .chip.btn { cursor: pointer; color: var(--ink); }
+  .chip.btn:hover { border-color: var(--ink-2); }
+  .hint { margin: 2px 18px 12px; font-size: 11.5px; color: var(--ink-3); letter-spacing: .04em; line-height: 1.75; }
+
+  /* ---- 画布（可缩放相机） ---- */
+  .canvas-wrap { overflow: auto; padding: 0 14px 34px; max-height: 78vh; }
+  .zoomer { transition: transform .45s cubic-bezier(.22,.61,.36,1); will-change: transform; }
+  .canvas { position: relative; width: 460px; margin: 0 auto; }
+  .canvas svg { position: absolute; inset: 0; pointer-events: none; overflow: visible; transition: opacity .35s ease; }
+  .zoomer.focusing .node:not(.focus) { opacity: .1; filter: blur(3px); }
+  .zoomer.focusing svg { opacity: .05; }
+  /* left/top/width/height 的过渡让"展开⇄收起"和邻居让位都成为动画 */
+  .node { transition: left .34s ease, top .34s ease, width .34s ease, height .34s ease, opacity .4s ease, filter .4s ease, box-shadow .2s ease; }
+  .node.swap > *:not(.n-toggle) { animation: swapIn .32s ease; }
+  @keyframes swapIn { from { opacity: 0; } }
+
+  .node {
+    position: absolute; background: var(--paper); border: 1px solid var(--line);
+    border-radius: 8px; cursor: pointer;
+  }
+  .node:hover { box-shadow: 0 8px 24px rgba(60,50,30,.13); }
+  .node.focus { box-shadow: 0 0 0 2px var(--ink-2); }
+  .n-toggle {
+    position: absolute; top: -10px; right: -10px; width: 24px; height: 24px; border-radius: 50%;
+    background: var(--ink); color: #FBFAF7; border: none; font-size: 11px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,.18);
+  }
+  .n-toggle:hover { background: #211E1A; }
+
+  /* 收起的小卡 */
+  .node.small { padding: 10px 12px; }
+  .node.small .n-time { font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .node.small .n-title { font-family: var(--serif); font-size: 14px; letter-spacing: .04em; margin-top: 2px; }
+  .node.small .n-kind { font-size: 9px; letter-spacing: .2em; color: var(--ink-3); margin-top: 6px; }
+  .node.small.passage { background: var(--mist); }
+  .node.small.ending { border-style: dashed; }
+  .node.small.ending.good { border-color: var(--good); }
+  .node.small.ending.bad { border-color: var(--bad); }
+  .n-badge {
+    position: absolute; top: -9px; left: 10px; font-size: 9px; letter-spacing: .12em;
+    background: var(--good); color: #FBFAF7; padding: 2px 8px; border-radius: 999px;
+  }
+
+  /* 展开的完整编辑卡（画布上 / 聚焦视图共用骨架） */
+  .ed { padding: 12px 14px 14px; text-align: left; }
+  .ed-head { display: flex; gap: 8px; align-items: baseline; }
+  .ed-time { font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .ed-title { font-family: var(--serif); font-size: 14.5px; letter-spacing: .04em; }
+  .ed-kicker { font-size: 9px; letter-spacing: .22em; color: var(--ink-3); margin-left: auto; }
+  .ed-field {
+    border-bottom: 1px solid var(--line); padding: 6px 2px; font-size: 12px; line-height: 1.7;
+    color: var(--ink); margin-top: 8px;
+  }
+  .ed-label { font-size: 9px; letter-spacing: .2em; color: var(--ink-3); border: none; margin-top: 12px; padding: 0; }
+  .ed-choice { display: flex; align-items: center; gap: 8px; padding: 7px 2px; border-bottom: 1px solid var(--mist); font-size: 12.5px; }
+  .ed-choice:last-of-type { border-bottom: none; }
+  .ed-delta { font-size: 11px; font-weight: 600; }
+  .ed-delta.good { color: var(--good); } .ed-delta.bad { color: var(--bad); }
+  .ed-goto { margin-left: auto; font-size: 10.5px; color: var(--good); cursor: pointer; white-space: nowrap; letter-spacing: .03em; }
+  .ed-goto:hover { text-decoration: underline; }
+  .ed-fork { margin-top: 10px; font-size: 10.5px; color: var(--ink-3); letter-spacing: .06em; text-align: center; border: 1px dashed var(--line); border-radius: 4px; padding: 5px 8px; }
+  .ed-photo-row { display: flex; gap: 10px; margin-top: 8px; }
+  .ed-swatch {
+    width: 36px; height: 46px; border-radius: 4px; border: 1px dashed var(--ink-3);
+    display: flex; align-items: center; justify-content: center; font-size: 9px; color: var(--ink-3);
+    background: linear-gradient(180deg, #F4E9DA, #E6D7C1); flex: none;
+  }
+  .ed-swatch + .ed-field { flex: 1; margin-top: 0; align-self: stretch; display: flex; align-items: center; }
+
+  /* 聚焦视图（节点内部） */
+  #viewNode {
+    position: absolute; inset: 0; background: var(--bg); display: none;
+    flex-direction: column; opacity: 0; transition: opacity .18s ease; z-index: 10; overflow: hidden;
+  }
+  #viewNode.on { display: flex; }
+  #viewNode.vis { opacity: 1; }
+  /* 节点内部内容：进入时从放大姿态等比缩小归位，退出时反向放大淡出——与相机运动连成一次缩放 */
+  .node-body {
+    overflow: auto; padding: 4px 18px 40px; display: flex; flex-direction: column; gap: 12px;
+    transform-origin: 50% 16%;
+    transition: transform .38s cubic-bezier(.22,.61,.36,1), opacity .24s ease;
+  }
+  .node-body.zoomin-start,
+  .node-body.zoomout { transform: scale(1.32); opacity: 0; }
+  .node-body.zoomin-start { transition: none; }
+  .focus-card { background: var(--paper); border: 1px solid var(--ink-2); border-radius: 10px; box-shadow: 0 12px 36px rgba(60,50,30,.12); }
+  .focus-card .ed-title { font-size: 16px; }
+  .focus-card .ed-field, .focus-card .ed-choice { font-size: 13.5px; }
+  .divider { display: flex; align-items: center; gap: 10px; color: var(--ink-3); font-size: 10.5px; letter-spacing: .25em; }
+  .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+  .next-card { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; opacity: .88; }
+  .fade-swap { animation: fadeSwap .25s ease; }
+  @keyframes fadeSwap { from { opacity: 0; transform: translateY(6px); } }
+
+  .edge-label { font-size: 9.5px; fill: #A38D6A; paint-order: stroke; stroke: var(--bg); stroke-width: 4px; letter-spacing: .04em; }
+</style>
+</head>
+<body>
+<div class="phone" id="phone">
+
+  <!-- 画布总览 -->
+  <div class="view-canvas" id="viewCanvas">
+    <header class="bar">
+      <div class="bar-title">剧本节点</div>
+      <span class="chip">工作日 · 9 节点 · 2 结局</span>
+      <button class="chip btn" id="collapseAll">收起全部</button>
+    </header>
+    <p class="hint">结构对称展开，连线（虚线）标出每个选项的走向。⤢ 展开节点的完整编辑卡（会记住）；
+      点按卡片本体 = 相机推进，聚焦进这个节点内部。</p>
+    <div class="canvas-wrap" id="wrap">
+      <div class="zoomer" id="zoomer">
+        <div class="canvas" id="canvas"><svg id="edges"></svg></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 节点内部（聚焦编辑） -->
+  <div id="viewNode">
+    <header class="bar">
+      <button class="chip btn" id="backBtn">‹ 节点总览</button>
+      <span class="chip" id="scopeChip">—</span>
+    </header>
+    <p class="hint">你正处在这个节点的内部。上半部分是它自己的完整编辑卡，向下是它默认走向的后续支路。</p>
+    <div class="node-body" id="nodeBody"></div>
+  </div>
+</div>
+
+<script>
+/* ================= 数据：对称结构，无「支线」概念 =================
+   每个决策时刻的选项即出边；过场有唯一后继；结局即终点。 */
+const N = {
+  start: { id:'start', col:'center', kind:'moment', time:'08:30', title:'清晨 · 卧室', badge:'起点',
+    narration:'闹钟响到第三遍。窗帘缝里，天已经亮透了。被窝很暖，而接下来的一整天，正等你在这一刻开口。',
+    choices:[
+      { t:'起床，拉开窗帘', d:-8, to:'A' },
+      { t:'再躺十分钟……', d:12, to:'B' },
+    ] },
+  A: { id:'A', col:'left', kind:'moment', time:'09:30', title:'早晨 · 街道',
+    narration:'洗漱完毕，肚子轻轻叫了。楼下的早餐铺，应该正是热气腾腾的时候。',
+    choices:[
+      { t:'出门，去买份热早餐', d:-8, to:'noon' },
+      { t:'点外卖，边等边刷手机', d:12, to:'B' },
+    ] },
+  B: { id:'B', col:'right', kind:'moment', time:'10:30', title:'拖延 · 被窝与手机',
+    narration:'回过神来，一小时已经过去了。手指还在往下滑。',
+    choices:[
+      { t:'爬起来，洗把脸', d:-5, to:'noon' },
+      { t:'外卖到了，吃完继续躺', d:10, to:'D' },
+    ] },
+  noon: { id:'noon', col:'center', kind:'moment', time:'14:00', title:'午后 · 房间', badge:'2 路合流',
+    narration:'午后的光斜斜地落在地板上。你恰好有一段完整的空档——身体和惰性，都在等你的答复。',
+    choices:[
+      { t:'换上运动鞋，去出一身汗', d:-15, to:'C' },
+      { t:'就这样瘫一会儿', d:10, to:'D' },
+    ] },
+  C: { id:'C', col:'left', kind:'passage', time:'16:00', title:'出了一身汗',
+    text:'心跳快起来的时候，那些模糊的烦躁也跟着蒸发了。', next:'dusk' },
+  D: { id:'D', col:'right', kind:'passage', time:'16:40', title:'一下午滑了过去',
+    text:'屏幕暗下来的时候，窗外的光已经斜了。', next:'dusk' },
+  dusk: { id:'dusk', col:'center', kind:'moment', time:'19:30', title:'傍晚 · 书桌', badge:'2 路合流',
+    narration:'天色一点一点暗下来。桌上还摊着那些你想做、却一直没有开始的事。',
+    choices:[
+      { t:'坐下来，做完其中一件', d:-10, to:'E' },
+      { t:'算了，先躺着刷会儿手机', d:10, to:'F' },
+    ] },
+  E: { id:'E', col:'left', kind:'ending', time:'23:00', title:'夜 · 安然入睡', ending:'good',
+    text:'灯黑下来的那一瞬间，今天被妥善地收好了。' },
+  F: { id:'F', col:'right', kind:'ending', time:'01:40', title:'夜 · 内耗', ending:'bad',
+    text:'一集，又一集。你越来越清醒，也越来越空。' },
+}
+
+const ROWS = [['start'], ['A','B'], ['noon'], ['C','D'], ['dusk'], ['E','F']]
+const COLX = { left: 130, center: 230, right: 330 }
+const SMALL_H = { moment: 92, passage: 64, ending: 76 }
+const SMALL_W = 176, WIDE_W = 208
+
+const byId = (id) => N[id]
+function edgesOf(n) {
+  if (n.kind === 'moment') return n.choices.map((c) => ({ from: n.id, to: c.to, label: c.t }))
+  if (n.kind === 'passage') return [{ from: n.id, to: n.next }]
+  return []
+}
+function nextOf(n) {
+  const e = edgesOf(n)[0]
+  return e ? byId(e.to) : null
+}
+function pathFrom(id) {
+  const seq = [], seen = new Set()
+  let cur = byId(id)
+  while (cur && !seen.has(cur.id)) { seen.add(cur.id); seq.push(cur); cur = nextOf(cur) }
+  return seq
+}
+
+/* ================= 展开 / 收起（状态持久） ================= */
+const LS_KEY = 'galplan-mockup-expanded'
+const expanded = new Set(JSON.parse(localStorage.getItem(LS_KEY) || '[]'))
+function persistExpanded() { localStorage.setItem(LS_KEY, JSON.stringify([...expanded])) }
+
+/* ================= 画布渲染 ================= */
+const canvas = document.getElementById('canvas')
+const svg = document.getElementById('edges')
+
+function editorHTML(n) {
+  const KIND = { moment: '决策时刻', passage: '过场', ending: '终章 → 夜记' }
+  let h = `
+    <div class="ed-head"><span class="ed-time">${n.time}</span>
+      <span class="ed-title">${n.title}</span><span class="ed-kicker">${KIND[n.kind]}</span></div>`
+  if (n.kind === 'ending') {
+    h += `<div class="ed-field">${n.text}</div>
+          <div class="ed-field" style="color:var(--ink-2)">夜记将以「${n.ending === 'good' ? '晴' : '沉'}」的文风收尾。</div>`
+    return h
+  }
+  if (n.kind === 'passage') {
+    h += `
+      <div class="ed-photo-row"><span class="ed-swatch">＋照片</span>
+        <div class="ed-field">${n.text}</div></div>
+      <div class="ed-label">走 向</div>
+      <div class="ed-choice"><span style="color:var(--ink-3)">▸ 顺延下一时刻</span>
+        <span class="ed-goto" data-goto="${n.next}">→ ${byId(n.next)?.title ?? ''} ↗</span></div>`
+    return h
+  }
+  h += `
+    <div class="ed-photo-row"><span class="ed-swatch">＋照片</span>
+      <div class="ed-field">${n.narration}</div></div>
+    <div class="ed-label">过 场</div>
+    <div class="ed-field" style="color:var(--ink-3)">＋ 过场：一段没有选项的叙述……</div>
+    <div class="ed-label">选 项</div>`
+  for (const c of n.choices) {
+    h += `
+      <div class="ed-choice"><span>○ ${c.t}</span>
+        <span class="ed-delta ${c.d < 0 ? 'good' : 'bad'}">${c.d > 0 ? '+' : ''}${c.d}</span>
+        <span class="ed-goto" data-goto="${c.to}">→ ${byId(c.to)?.title} ↗</span></div>`
+  }
+  h += `<div class="ed-fork">⋯ 任一选项都可分出新节点，之后可指回任意时刻（合流）</div>`
+  return h
+}
+
+function buildNode(n) {
+  const el = document.createElement('div')
+  const isOpen = expanded.has(n.id)
+  const w = isOpen ? WIDE_W : SMALL_W
+  el.style.width = w + 'px'
+  el.className = `node ${isOpen ? 'wide' : 'small'} ${n.kind}${n.ending ? ' ' + n.ending : ''}`
+  el.dataset.id = n.id
+  if (isOpen) el.innerHTML = `<div class="ed">${editorHTML(n)}</div>`
+  else {
+    el.innerHTML = `
+      ${n.badge ? `<span class="n-badge">${n.badge}</span>` : ''}
+      <div class="n-time">${n.time}</div>
+      <div class="n-title">${n.title}</div>
+      <div class="n-kind">${{ moment: '决策时刻', passage: '过场', ending: '终章 → 夜记' }[n.kind]}</div>`
+  }
+  const tg = document.createElement('button')
+  tg.className = 'n-toggle'
+  tg.textContent = isOpen ? '⤡' : '⤢'
+  tg.title = isOpen ? '收起为小卡' : '展开完整编辑卡'
+  tg.addEventListener('click', (e) => { e.stopPropagation(); toggleNode(n.id) })
+  el.appendChild(tg)
+  // 画布上的编辑卡内部点击不触发聚焦
+  el.querySelectorAll('.ed-goto').forEach((g) => g.addEventListener('click', (e) => e.stopPropagation()))
+  el.addEventListener('click', () => focusNode(n))
+  return el
+}
+
+function mountNodes() {
+  canvas.querySelectorAll('.node').forEach((el) => el.remove())
+  for (const n of Object.values(N)) {
+    const el = buildNode(n)
+    canvas.appendChild(el)
+    n._el = el
+  }
+}
+
+function layout() {
+  let y = 24
+  for (const row of ROWS) {
+    let maxH = 0
+    for (const id of row) {
+      const n = byId(id)
+      const w = expanded.has(id) ? WIDE_W : SMALL_W
+      n._el.style.left = COLX[n.col] - w / 2 + 'px'
+      n._el.style.top = y + 'px'
+      maxH = Math.max(maxH, n._el.offsetHeight || (expanded.has(id) ? 200 : SMALL_H[n.kind]))
+    }
+    y += maxH + 74
+  }
+  canvas.style.height = y + 20 + 'px'
+}
+
+function drawEdges() {
+  svg.innerHTML = ''
+  svg.setAttribute('width', canvas.offsetWidth)
+  svg.setAttribute('height', canvas.offsetHeight)
+  for (const n of Object.values(N)) {
+    for (const e of edgesOf(n)) {
+      const t = byId(e.to)
+      const a = rectOf(n), b = rectOf(t)
+      drawEdge(a, b, e.label, n, t)
+    }
+  }
+}
+
+function rectOf(n) {
+  return {
+    x: n._el.offsetLeft, y: n._el.offsetTop, w: n._el.offsetWidth, h: n._el.offsetHeight,
+    col: n.col, row: rowOf(n.id),
+  }
+}
+function rowOf(id) { return ROWS.findIndex((r) => r.includes(id)) }
+
+function drawEdge(a, b, label, fn, tn) {
+  const sameRow = a.row === b.row
+  const skip = Math.abs(a.row - b.row) > 1
+  let x1, y1, x2, y2, ctrl
+  if (sameRow) {
+    if (b.x > a.x) { x1 = a.x + a.w; y1 = a.y + a.h / 2; x2 = b.x; y2 = b.y + b.h / 2; ctrl = 60 }
+    else { x1 = a.x; y1 = a.y + a.h / 2; x2 = b.x + b.w; y2 = b.y + b.h / 2; ctrl = -60 }
+  } else {
+    x1 = a.x + a.w / 2; y1 = a.y + a.h; x2 = b.x + b.w / 2; y2 = b.y
+    ctrl = 0
+  }
+  const bulge = skip ? 52 * (fn.col === 'right' ? 1 : -1) : 0
+  const d = sameRow
+    ? `M${x1},${y1} C${x1 + ctrl},${y1} ${x2 - ctrl},${y2} ${x2},${y2}`
+    : `M${x1},${y1} C${x1 + bulge},${y1 + 56} ${x2 + bulge},${y2 - 56} ${x2},${y2}`
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+  path.setAttribute('d', d)
+  path.setAttribute('fill', 'none')
+  path.setAttribute('stroke', label ? '#A38D6A' : '#CFC8BA')
+  path.setAttribute('stroke-width', label ? '1.3' : '1.6')
+  path.setAttribute('stroke-dasharray', label ? '4 4' : '5 5')   // 全部虚线
+  svg.appendChild(path)
+
+  const arr = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+  const dir = sameRow ? (b.x > a.x ? -90 : 90) : 0
+  arr.setAttribute('d', `M${x2},${y2} m-3.5,-5 l7,0 l-3.5,7 z`)
+  arr.setAttribute('transform', `rotate(${dir}, ${x2}, ${y2})`)
+  arr.setAttribute('fill', label ? '#A38D6A' : '#CFC8BA')
+  svg.appendChild(arr)
+
+  if (label) {
+    const mx = (x1 + x2) / 2 + bulge
+    const my = sameRow ? y1 - 8 : (y1 + y2) / 2
+    const tx = document.createElementNS('http://www.w3.org/2000/svg', 'text')
+    tx.setAttribute('x', mx); tx.setAttribute('y', my - 5)
+    tx.setAttribute('text-anchor', 'middle')
+    tx.setAttribute('class', 'edge-label')
+    tx.textContent = label.length > 9 ? label.slice(0, 8) + '…' : label
+    svg.appendChild(tx)
+  }
+}
+
+function refresh() { layout(); drawEdges() }
+
+/* 展开 / 收起：高度与位置带动画，邻居平滑让位；连线淡出后重绘避免错位 */
+function toggleNode(id) {
+  const n = byId(id)
+  const old = n._el
+  const startH = old.offsetHeight
+  expanded.has(id) ? expanded.delete(id) : expanded.add(id)
+  persistExpanded()
+
+  const next = buildNode(n)
+  next.classList.add('swap')
+  old.replaceWith(next)
+  n._el = next
+
+  svg.style.opacity = '0.05'
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    next.style.height = ''      // 先还原为内容自然高度，供 layout 计算最终布局
+    layout()                    // 设置目标 top/left/width（由 CSS 过渡滑过去）
+    const endH = next.offsetHeight
+    next.style.height = startH + 'px'
+    void next.offsetWidth
+    next.style.height = endH + 'px'
+    next.addEventListener('transitionend', function onEnd(e) {
+      if (e.propertyName !== 'height') return
+      next.style.height = ''
+      next.removeEventListener('transitionend', onEnd)
+    })
+  }))
+  setTimeout(() => {
+    drawEdges()
+    svg.style.opacity = ''
+  }, 360)
+}
+
+document.getElementById('collapseAll').addEventListener('click', () => {
+  expanded.clear(); persistExpanded(); mountNodes(); refresh()
+})
+
+/* ================= 相机推进：聚焦进节点内部 ================= */
+const wrap = document.getElementById('wrap')
+const zoomer = document.getElementById('zoomer')
+const viewNode = document.getElementById('viewNode')
+const nodeBody = document.getElementById('nodeBody')
+const scopeChip = document.getElementById('scopeChip')
+let focusId = null
+
+function targetTransform(el) {
+  // 计算把 el 放大到撑满 wrap 视口所需的 transform（origin 在卡片中心）
+  const zr = zoomer.getBoundingClientRect()
+  const r = el.getBoundingClientRect()
+  const ox = r.left - zr.left + r.width / 2
+  const oy = r.top - zr.top + r.height / 2
+  const cx = wrap.clientWidth / 2
+  const cy = wrap.scrollTop + wrap.clientHeight / 2
+  const s = Math.min((wrap.clientWidth - 24) / r.width, 3)
+  return { ox, oy, transform: `translate(${cx - ox}px, ${cy - oy}px) scale(${s})` }
+}
+
+function applyTransform(t, animate) {
+  zoomer.style.transition = animate ? 'transform .45s cubic-bezier(.22,.61,.36,1)' : 'none'
+  zoomer.style.transformOrigin = `${t.ox}px ${t.oy}px`
+  zoomer.style.transform = t.transform
+}
+
+function focusNode(n) {
+  focusId = n.id
+  const t = targetTransform(n._el)
+  n._el.classList.add('focus')
+  zoomer.classList.add('focusing')
+  applyTransform(t, true)
+  setTimeout(() => {
+    renderNodeView(n.id)
+    // 内容从放大的姿态等比缩小归位，与相机的推近连成一次连续缩放
+    nodeBody.classList.add('zoomin-start')
+    viewNode.classList.add('on')
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      viewNode.classList.add('vis')
+      nodeBody.classList.remove('zoomin-start')
+    }))
+    // 注意：画布保持在缩放姿态驻留（不复位），退出时直接缩小回去
+  }, 250)
+}
+
+document.getElementById('backBtn').addEventListener('click', () => {
+  const n = byId(focusId)
+  if (!n || !n._el) { viewNode.classList.remove('on', 'vis'); return }
+  // 画布仍驻留在缩放姿态：内容反向放大淡出的同时，相机直接缩小回全景——无任何姿态重摆
+  nodeBody.classList.add('zoomout')
+  viewNode.classList.remove('vis')
+  applyTransform({ ox: 0, oy: 0, transform: 'none' }, true)
+  zoomer.style.transformOrigin = '0 0'
+  setTimeout(() => {
+    viewNode.classList.remove('on')
+    nodeBody.classList.remove('zoomout')
+    nodeBody.style.transform = ''
+  }, 260)
+  setTimeout(() => {
+    zoomer.classList.remove('focusing')
+    n._el.classList.remove('focus')
+  }, 470)
+})
+
+/* ================= 聚焦视图渲染 ================= */
+function renderNodeView(id) {
+  const n = byId(id)
+  const seq = pathFrom(id)
+  scopeChip.textContent = `聚焦 · ${n.title} · 后续 ${Math.max(0, seq.length - 1)} 节点`
+  nodeBody.innerHTML = ''
+
+  const self = document.createElement('div')
+  self.className = 'focus-card'
+  self.innerHTML = `<div class="ed">${editorHTML(n)}</div>`
+  nodeBody.appendChild(self)
+
+  if (seq.length > 1) {
+    const div = document.createElement('div')
+    div.className = 'divider'
+    div.textContent = '默认走向 ↓'
+    nodeBody.appendChild(div)
+    for (const m of seq.slice(1)) nodeBody.appendChild(nextCard(m))
+  }
+  nodeBody.classList.remove('fade-swap'); void nodeBody.offsetWidth
+  nodeBody.classList.add('fade-swap')
+  nodeBody.querySelectorAll('[data-goto]').forEach((g) =>
+    g.addEventListener('click', () => {
+      // 在聚焦视图内跳到另一条走向的目标节点
+      const target = g.dataset.goto
+      const tn = byId(target)
+      if (!tn) return
+      focusId = target
+      renderNodeView(target)
+      nodeBody.scrollTo({ top: 0 })
+    }),
+  )
+}
+
+function nextCard(n) {
+  const el = document.createElement('div')
+  el.className = 'next-card'
+  const KIND = { moment: '决策时刻', passage: '过场', ending: '终章' }
+  let h = `<div class="ed-head"><span class="ed-time">${n.time}</span>
+    <span class="ed-title">${n.title}</span><span class="ed-kicker">${KIND[n.kind]}</span></div>`
+  if (n.kind === 'ending') h += `<div class="ed-field">${n.text}</div>`
+  else if (n.kind === 'passage') h += `<div class="ed-field">${n.text}</div>`
+  else {
+    h += `<div class="ed-field" style="color:var(--ink-2)">${n.narration}</div>`
+    for (const c of n.choices) {
+      h += `<div class="ed-choice"><span>○ ${c.t}</span>
+        <span class="ed-delta ${c.d < 0 ? 'good' : 'bad'}">${c.d > 0 ? '+' : ''}${c.d}</span>
+        <span class="ed-goto" data-goto="${c.to}">→ ${byId(c.to)?.title} ↗</span></div>`
+    }
+  }
+  el.innerHTML = h
+  return el
+}
+
+/* ================= 启动 ================= */
+mountNodes()
+refresh()
+</script>
+</body>
+</html>
