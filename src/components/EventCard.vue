@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useGame, toMinutes, bgKeyOf } from '../store.js'
 import { confirmBox } from '../confirm.js'
 import { isMedia, delMedia, fileToMedia } from '../media.js'
+import TimingSheet from './TimingSheet.vue'
 
 /** 缩略图：视频用首帧 poster，照片用原图；视频加 ▶ 角标 */
 const srcOf = (p) => (isMedia(p) ? p.poster || '' : p || '')
@@ -145,6 +146,8 @@ async function onPhoto(e) {
     if (!media) return
     if (isMedia(props.scene.photo)) delMedia(props.scene.photo.id).catch(() => {})
     patchScene(presets.activeId, props.scene.id, { photo: media })
+    // 传的是视频 → 弹一次「选项时机」（照片不弹；之后随时用下方开关改）
+    if (media.kind === 'video') timingSheet.value = true
   } catch {
     /* 放弃 */
   }
@@ -155,6 +158,20 @@ async function clearPhoto() {
     if (isMedia(p)) delMedia(p.id).catch(() => {})
     patchScene(presets.activeId, props.scene.id, { photo: null })
   }
+}
+/** 背景视频专设：选项等视频播完再弹出（galgame 式演出）；循环视频在第一遍播完时弹 */
+function toggleWaitEnd() {
+  const p = props.scene.photo
+  if (!isVid(p)) return
+  patchScene(presets.activeId, props.scene.id, { photo: { ...p, waitEnd: !p.waitEnd } })
+}
+/* 上传视频后的一次性「选项时机」选择 */
+const timingSheet = ref(false)
+function applyWaitEnd(v) {
+  const p = props.scene.photo
+  if (!isVid(p)) return
+  patchScene(presets.activeId, props.scene.id, { photo: { ...p, waitEnd: v } })
+  timingSheet.value = false
 }
 
 const introPhotoEl = ref(null)
@@ -270,6 +287,14 @@ async function clearEffectPhoto(idx) {
       <button class="ev-del" title="删除时刻" @click="emit('delete', scene)">✕</button>
     </div>
 
+    <!-- 背景是视频时的选项弹出时机：立即（默认）或等视频播完（循环视频=第一遍播完） -->
+    <div v-if="isVid(scene.photo)" class="ev-crow ev-waitend">
+      <span class="ev-delta-label">选项时机</span>
+      <button type="button" class="ev-waitend-btn" :class="{ on: scene.photo.waitEnd }" @click="toggleWaitEnd">
+        {{ scene.photo.waitEnd ? '视频播完再弹出' : '与旁白同时出现' }}
+      </button>
+    </div>
+
     <!-- 节点 = 引子 + 选项 + 效果：选项区开头标出来；块旁的 ①② 与画布箭头序号对应 -->
     <span class="ev-sec">选项</span>
 
@@ -329,6 +354,9 @@ async function clearEffectPhoto(idx) {
     <input ref="photoEl" type="file" accept="image/*,video/*" hidden @click.stop @change="onPhoto" />
     <input ref="introPhotoEl" type="file" accept="image/*,video/*" hidden @click.stop @change="onIntroPhoto" />
     <input ref="effectPhotoEl" type="file" accept="image/*,video/*" hidden @click.stop @change="onEffectPhoto" />
+
+    <!-- 上传视频背景后的「选项时机」弹层（内部 Teleport 到 body，画布 transform 下也能贴屏幕底部） -->
+    <TimingSheet v-if="timingSheet" @pick="applyWaitEnd" @close="timingSheet = false" />
 
     <!-- 走向底部弹层：新建分支 / 合到已有节点 / 结束这一天。
          Teleport 到 body：画布 .zoomer 带 will-change:transform，其后代里的
@@ -459,6 +487,19 @@ textarea.fi {
 .ev-goto-btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ev-goto-btn i { font-style: normal; color: var(--ink-3); flex: none; }
 
+/* 视频背景的选项弹出时机开关 */
+.ev-waitend { margin-top: 2px; }
+.ev-waitend-btn {
+  font: inherit; font-size: 12px; color: var(--ink-2);
+  background: var(--mist); border: 1px solid transparent; border-radius: 6px;
+  padding: 6px 10px; cursor: pointer; min-width: 0; flex: 1; text-align: left;
+}
+.ev-waitend-btn.on {
+  color: var(--ink);
+  background: #F0E9D8;
+  border-color: var(--line);
+}
+
 /* 走向底部弹层 */
 .ev-sheet-mask {
   position: fixed; inset: 0; z-index: 40;
@@ -511,5 +552,11 @@ textarea.fi {
 .ev.mini .fi { font-size: 12.5px; padding: 5px 2px 1px; }
 .ev.mini textarea.fi { font-size: 12.5px; }
 .ev.mini .ev-choice { padding: 8px; gap: 6px; }
-.ev.mini .ev-top { gap: 9px; }
+/* mini 头部竖排：卡宽 208 放不下「照片＋时间(固定104px)＋标题」一行，标题会被挤到 0 宽。
+   照片与 ✕ 一行，时间/标题/旁白依次整行铺开（聚焦视图宽度足够，保持原横排） */
+.ev.mini .ev-top { gap: 9px; flex-wrap: wrap; justify-content: space-between; }
+.ev.mini .ev-del { order: 1; }
+.ev.mini .ev-meta { order: 2; flex: 1 1 100%; }
+.ev.mini .ev-row { flex-wrap: wrap; }
+.ev.mini .ev-row .fi.grow { flex: 1 1 100%; }
 </style>

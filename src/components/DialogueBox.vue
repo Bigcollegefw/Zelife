@@ -50,7 +50,7 @@ defineExpose({ skip, isTyping: () => !done.value })
 </script>
 
 <template>
-  <div class="dbox" :class="{ bare: variant === 'bare' }" @click="skip">
+  <div class="dbox" :class="{ bare: variant === 'bare' }" @click.stop="skip">
     <div v-if="tag && variant !== 'bare'" class="dbox-tag">{{ tag }}</div>
     <p class="dbox-text serif">{{ shown }}<i v-if="!done" class="dbox-caret" /></p>
   </div>

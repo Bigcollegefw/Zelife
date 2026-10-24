@@ -3,8 +3,10 @@ import { onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useGame } from './store.js'
 import { migratePhotosToIdb } from './media.js'
+import { initAuth } from './auth.js'
 import ConfirmBox from './components/ConfirmBox.vue'
 import FitAdjust from './components/FitAdjust.vue'
+import AuthSheet from './components/AuthSheet.vue'
 
 const route = useRoute()
 const { state, presets, persistPresets } = useGame()
@@ -12,6 +14,8 @@ const { state, presets, persistPresets } = useGame()
 onMounted(() => {
   // 一次性：历史 dataURL 照片搬进 IndexedDB，给 localStorage 瘦身
   migratePhotosToIdb(presets, persistPresets)
+  // 账号：后台校验本地 token，不阻塞 app
+  initAuth()
 })
 </script>
 
@@ -24,5 +28,6 @@ onMounted(() => {
     </router-view>
     <ConfirmBox />
     <FitAdjust />
+    <AuthSheet />
   </div>
 </template>

@@ -21,3 +21,13 @@ export function fileToPhoto(file, maxEdge = 1080, quality = 0.78) {
     reader.readAsDataURL(file)
   })
 }
+
+// 原图 dataURL（头像用：先给 AvatarCropper 调整构图，裁剪压缩在那里做）
+export function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result)
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}

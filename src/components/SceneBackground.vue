@@ -20,6 +20,24 @@ const natW = ref(0)
 const natH = ref(0)
 const sizeTick = ref(0) // 屏幕尺寸变化时重算构图
 
+const emit = defineEmits(['ended'])
+
+/* waitEnd 门控（视频播完再出选项）：原生 loop 循环不触发 ended，
+   此时改手动循环——第一遍播完先 emit('ended')，再从头续播 */
+const gated = computed(() => isMedia(props.media) && props.media.kind === 'video' && !!props.media.waitEnd)
+const nativeLoop = computed(() => kind.value === 'video' && loop.value && !gated.value)
+
+function onVidEnded() {
+  emit('ended')
+  if (gated.value && loop.value) {
+    const v = vidEl.value
+    if (v) {
+      v.currentTime = 0
+      v.play?.().catch(() => {})
+    }
+  }
+}
+
 // 定格 ⇄ 循环切换：若已停在最后一帧，切到循环后接着播
 watch(loop, (v) => {
   if (v && vidEl.value?.ended) vidEl.value.play?.().catch(() => {})
@@ -90,8 +108,9 @@ function onImgLoad() {
       muted
       playsinline
       autoplay
-      :loop="loop"
+      :loop="nativeLoop"
       :poster="poster || undefined"
+      @ended="onVidEnded"
     />
   </div>
 </template>

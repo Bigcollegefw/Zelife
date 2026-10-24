@@ -15,6 +15,7 @@ import GloomMeter from '../components/GloomMeter.vue'
 import DialogueBox from '../components/DialogueBox.vue'
 import ChoiceList from '../components/ChoiceList.vue'
 import SceneBackground from '../components/SceneBackground.vue'
+import TimingSheet from '../components/TimingSheet.vue'
 
 const router = useRouter()
 const { state, presets, activePreset, frontier, tier, isEnterable, choose, catchUp, patchScene, persistPresets } =
@@ -268,7 +269,11 @@ async function pickBgFile(slot, e) {
   if (!f) return
   try {
     const media = await fileToMedia(f)
-    if (media) await applyBg(slot, media)
+    if (media) {
+      await applyBg(slot, media)
+      // 场景视频上传完弹一次「选项时机」（结算背景没有选项，不弹）
+      if (slot === 'scene' && media.kind === 'video') timingSheet.value = true
+    }
   } catch {
     /* 读取失败则放弃 */
   }
@@ -308,6 +313,57 @@ async function togglePhoto() {
   } else {
     fileEl.value?.click()
   }
+}
+
+/* 上传场景视频后弹一次「选项时机」；之后随时在节点编辑卡里改 */
+const timingSheet = ref(false)
+function applyWaitEnd(v) {
+  const s = activeScene.value
+  if (!s || !isMedia(s.photo) || s.photo.kind !== 'video') return
+  patchScene(presets.activeId, s.id, { photo: { ...s.photo, waitEnd: v } })
+  timingSheet.value = false
+}
+
+/* ---------- 选项等视频播完（galgame 式）：进选择页视频从头播，播完才弹选项；
+   循环视频由 SceneBackground 手动续播，第一遍播完同样 emit ended ---------- */
+const bgVideoEnded = ref(false)
+// 换节点 / 重进选择页 / 换了视频 → 重新等；切循环⇄定格（id 不变）不打断
+watch(
+  () => [activeId.value, phase.value, isMedia(bgMedia.value) ? bgMedia.value.id : ''],
+  () => {
+    bgVideoEnded.value = false
+  },
+)
+const choicesWaitVideo = computed(
+  () => phase.value === 'choose' && bgIsVideo.value && !!activeScene.value?.photo?.waitEnd && !bgVideoEnded.value,
+)
+
+/* ---------- 结算背景：与其他背景同款交互（文案随内容变 / 移除确认 / 视频循环切换） ---------- */
+const finaleMedia = computed(() => activePreset.value?.finale?.photo ?? null)
+const finaleIsVideo = computed(() => isMedia(finaleMedia.value) && finaleMedia.value.kind === 'video')
+
+/** 结算背景按钮：已有 → 确认移除（移除后回落到最后一幕的背景）；没有 → 打开选图/选视频 */
+async function onFinalePhotoBtn() {
+  if (!finaleMedia.value) {
+    finalePhotoEl.value?.click()
+    return
+  }
+  const label = finaleIsVideo.value ? '移除结算背景视频？' : '移除结算背景照片？'
+  if (!(await confirmBox(label, { danger: true }))) return
+  const p = presets.list.find((x) => x.id === presets.activeId)
+  if (!p) return
+  if (isMedia(finaleMedia.value)) delMedia(finaleMedia.value.id).catch(() => {})
+  p.finale = { ...(p.finale ?? {}), photo: null }
+  persistPresets()
+}
+
+/** 结算背景是视频时，一键在 循环 ⇄ 定格 之间切换 */
+function toggleFinaleLoop() {
+  const m = finaleMedia.value
+  const p = presets.list.find((x) => x.id === presets.activeId)
+  if (!isMedia(m) || m.kind !== 'video' || !p) return
+  p.finale = { ...(p.finale ?? {}), photo: { ...m, loop: !m.loop } }
+  persistPresets()
 }
 
 /* ---------- 在引子画面上直接换当前段的背景（图/视频，写进预设） ---------- */
@@ -369,7 +425,7 @@ const canReplay = computed(() => state.log.length > 0)
 const showReplayCtl = canReplay // 任何一幕都能进回看，落点跟着当下所在的幕走
 
 // 时间线：每段引子一步、每次决定两步（选择现场 + 效果过场）、错过一步；
-// 还没走到的「此刻」也排在尽头（当下这幕的引子 + 未选的选择页），今天走完则补一步结局
+// 尽头是「此刻」尾巴——当下这幕已经看过的引子（没做的选择不进回看），今天走完则补一步结局
 const rpTimeline = computed(() => {
   const steps = []
   state.log.forEach((e, ei) => {
@@ -381,10 +437,14 @@ const rpTimeline = computed(() => {
   })
   const f = frontier.value
   if (f) {
+    // 「此刻」尾巴：只排已经看过的引子——引子中排到当前段为止，选择页排全部引子；
+    // 等待 / 效果等还没开场的时刻一个都不排。没做的选择永远翻不到，不剧透
     const node = activePreset.value.nodes[f.id] ?? null
-    const intros = (node?.intros ?? []).filter((it) => (it.text ?? '').trim() || it.photo)
-    intros.forEach((it, i) => steps.push({ kind: 'intro', node, sceneId: f.id, it, i, n: intros.length, now: true }))
-    steps.push({ kind: 'choose', node, sceneId: f.id, now: true })
+    const all = (node?.intros ?? []).filter((it) => (it.text ?? '').trim() || it.photo)
+    let seen = []
+    if (phase.value === 'interlude' && activeId.value === f.id) seen = all.slice(0, introIndex.value + 1)
+    else if (phase.value === 'choose') seen = all
+    seen.forEach((it, i) => steps.push({ kind: 'intro', node, sceneId: f.id, it, i, n: all.length, now: true }))
   } else if (state.log.length) {
     steps.push({ kind: 'finale', sceneId: state.log[state.log.length - 1]?.sceneId ?? null })
   }
@@ -392,6 +452,8 @@ const rpTimeline = computed(() => {
 })
 const rpStep = computed(() => rpTimeline.value[rpPos.value] ?? null)
 const rpTailStart = computed(() => rpTimeline.value.findIndex((s) => s.now))
+/* 页签与计数都以「节点」为单位：已做决定 + 尾巴里有内容的此刻 */
+const rpNodeCount = computed(() => state.log.length + (rpTailStart.value >= 0 ? 1 : 0))
 
 /** 进入回看时的落点：跟着当下所在的幕走 */
 function rpEntryIndex() {
@@ -406,15 +468,15 @@ function rpEntryIndex() {
     return t.length - 1
   }
   if (phase.value === 'interlude') {
-    // 引子过场：停在眼前这一段
+    // 引子过场：停在眼前这一段（尾巴只排到这一段为止，翻不过去）
     const at = t.findIndex((s) => s.now && s.kind === 'intro' && s.sceneId === activeId.value && s.i === introIndex.value)
     if (at >= 0) return at
     const first = t.findIndex((s) => s.now && s.kind === 'intro' && s.sceneId === activeId.value)
     if (first >= 0) return first
   }
-  // 决定页 / 等待 / 错过摘要：停在上一幕（当下时刻的前一步）
+  // 决定页：停在上一幕的收尾；等待 / 错过摘要：停在最后一条已记录的步
   const tail = t.findIndex((s) => s.now)
-  return tail > 0 ? tail - 1 : 0
+  return tail > 0 ? tail - 1 : t.length - 1
 }
 
 function enterReplay() {
@@ -488,14 +550,14 @@ const rpMissedText = computed(() =>
     : '',
 )
 const rpFinaleText = computed(() => `一天到此为止。${tier.value.label}——${tier.value.phrase}。`)
-/* 底部小标签：现在翻到哪了 */
+/* 底部小标签：现在翻到第几个节点（与页签一一对应） */
 const rpWhere = computed(() => {
   const s = rpStep.value
   if (!s) return ''
-  const cnt = `${rpPos.value + 1} / ${rpTimeline.value.length}`
   if (s.kind === 'finale') return '一日终了'
-  if (s.now) return s.kind === 'intro' ? `此刻 · 引子 ${s.i + 1}/${s.n}` : '此刻'
-  return s.kind === 'intro' ? `回看 ${cnt} · 引子 ${s.i + 1}/${s.n}` : `回看 ${cnt}`
+  const seg = s.kind === 'intro' ? ` · 引子 ${s.i + 1}/${s.n}` : ''
+  if (s.now) return `此刻${seg}`
+  return `回看 ${(s.ei ?? 0) + 1} / ${rpNodeCount.value}${seg}`
 })
 const showDeltaFloat = computed(() =>
   deltaKey.value > 0 && ['effect', 'missed'].includes(phase.value),
@@ -507,8 +569,14 @@ const deltaClass = computed(() =>
 
 <template>
   <div class="stage" :class="{ immersive }" @click="onStageTap">
-    <SceneBackground :media="bgMedia" :bg-key="bgKey" :replay="activeId + ':' + phase" :style="bgStyle" class="scene-bg" />
-    <div class="scene-veil" />
+    <SceneBackground
+      :media="bgMedia"
+      :bg-key="bgKey"
+      :replay="activeId + ':' + phase"
+      :style="bgStyle"
+      class="scene-bg"
+      @ended="bgVideoEnded = true"
+    />
     <div class="scene-fog" :style="{ opacity: fogOpacity }" />
 
     <header class="stage-top">
@@ -518,9 +586,14 @@ const deltaClass = computed(() =>
     </header>
 
     <div v-if="showPhotoCtl" class="stage-photo-ctl" :class="{ down: showReplayCtl }">
-      <button v-if="phase === 'finale'" class="chip ghost small" @click.stop="finalePhotoEl?.click()">
-        设置结算照片
-      </button>
+      <template v-if="phase === 'finale'">
+        <button class="chip ghost small" @click.stop="onFinalePhotoBtn">
+          {{ !finaleMedia ? '换背景（图/视频）' : finaleIsVideo ? '移除视频' : '移除照片' }}
+        </button>
+        <button v-if="finaleIsVideo" class="chip ghost small" @click.stop="toggleFinaleLoop">
+          播放：{{ finaleMedia.loop ? '循环' : '定格' }}
+        </button>
+      </template>
       <template v-else>
         <button class="chip ghost small" @click.stop="togglePhoto">
           {{ !hasPhoto ? '换背景（图/视频）' : bgIsVideo ? '移除视频' : '移除照片' }}
@@ -534,6 +607,8 @@ const deltaClass = computed(() =>
       <input ref="effectPhotoEl" type="file" accept="image/*,video/*" hidden @click.stop @change="onEffectPhoto" />
       <input ref="finalePhotoEl" type="file" accept="image/*,video/*" hidden @click.stop @change="pickBgFile('finale', $event)" />
     </div>
+    <!-- 上传视频背景后的「选项时机」弹层（内部 Teleport 到 body） -->
+    <TimingSheet v-if="timingSheet" @pick="applyWaitEnd" @close="timingSheet = false" />
     <!-- 回看入口：任何一幕都在，进回看时落在当前这一幕 -->
     <button v-if="showReplayCtl" class="chip ghost small rp-enter" @click.stop="enterReplay">‹ 回看</button>
 
@@ -621,7 +696,7 @@ const deltaClass = computed(() =>
     <div class="stage-choices">
       <transition name="rise">
         <ChoiceList
-          v-if="phase === 'choose' && activeScene"
+          v-if="phase === 'choose' && activeScene && !choicesWaitVideo"
           :choices="activeScene.choices"
           @choose="pick"
         />
@@ -647,7 +722,6 @@ const deltaClass = computed(() =>
         <!-- 选择现场：当时的旁白与选项，选中的那支高亮；「此刻」还没选则都不亮 -->
         <template v-if="rpStep.kind === 'choose'">
           <SceneBackground :media="rpMedia" :bg-key="rpBgKey" :replay="'rp:' + rpPos" class="rp-scene" />
-          <div class="scene-veil" />
           <div class="rp-choose">
             <div class="stage-choices">
               <ChoiceList :choices="rpChoices" :chosen="rpChosen" readonly />
@@ -767,17 +841,6 @@ const deltaClass = computed(() =>
 /* ---- 背景层（渐变/照片/视频统一在 SceneBackground 组件里） ---- */
 .scene-bg { transition: filter 0.8s ease; }
 
-.scene-veil {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    180deg,
-    rgba(250, 248, 244, 0.25) 0%,
-    rgba(250, 248, 244, 0) 26%,
-    rgba(250, 248, 244, 0) 46%,
-    rgba(250, 248, 244, 0.78) 100%
-  );
-}
 .scene-fog {
   position: absolute;
   inset: 0;
@@ -942,6 +1005,8 @@ const deltaClass = computed(() =>
   padding-bottom: calc(152px + env(safe-area-inset-bottom));
 }
 .rp-dialog { position: relative; margin-top: auto; padding: 0 16px; }
+/* 回看里旁白框不拦截点击：轻触统一走「先补全打字、再翻页」 */
+.rp-dialog :deep(.dbox) { pointer-events: none; }
 /* 底部控制坞：进度在哪、页签、回到此刻，全部集中在中下 */
 .rp-dock {
   position: relative;
@@ -965,7 +1030,18 @@ const deltaClass = computed(() =>
   padding: 3px 12px;
 }
 .rp-nav { display: flex; align-items: center; justify-content: center; gap: 12px; }
-.rp-nav .btn { padding: 9px 16px; font-size: 13px; }
+/* 覆盖 btn.ghost 的透明底：照片背景上必须看得清 */
+.rp-nav .btn.ghost {
+  padding: 9px 16px;
+  font-size: 13px;
+  color: var(--ink);
+  background: rgba(252, 250, 246, 0.88);
+  border: 1px solid rgba(51, 48, 43, 0.14);
+  border-radius: 999px;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+.rp-nav .btn.ghost:hover { border-color: var(--ink-2); background: rgba(255, 255, 255, 0.95); }
 .rp-nav .btn:disabled { opacity: 0.35; cursor: default; }
 /* 页签：一颗＝一个决定，可点跳转；末尾一颗＝此刻 */
 .rp-dots {

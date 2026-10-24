@@ -3,10 +3,24 @@ import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useGame } from '../store.js'
 import { fmtDelta } from '../gloom.js'
+import { useAuth, openLogin } from '../auth.js'
 import GloomMeter from '../components/GloomMeter.vue'
 
 const router = useRouter()
 const { state, activePreset, frontier, finished, tier, setMode } = useGame()
+const { authState } = useAuth()
+
+/* 左上角头像：已登录点头像进个人主页；未登录点了拉起登录 */
+const hasAvatar = computed(
+  () => (authState.user?.avatar_version || 0) > 0 && authState.user?.avatar_status === 'ok'
+)
+const avatarUrl = computed(() =>
+  hasAvatar.value ? `/api/users/${authState.user.id}/avatar?v=${authState.user.avatar_version}` : ''
+)
+function onMe() {
+  if (authState.user) router.push('/me')
+  else openLogin()
+}
 
 const dateLabel = computed(() => {
   const d = state.date ? new Date(state.date) : new Date()
@@ -32,7 +46,13 @@ const deltaClass = (d) => (d > 0 ? 'good' : d < 0 ? 'bad' : 'zero')
 <template>
   <div class="summary">
     <header class="s-head">
-      <button class="btn ghost back" @click="router.push('/stage')">‹ 回到此刻</button>
+      <button class="s-me" @click="onMe">
+        <img v-if="hasAvatar" class="s-ava" :src="avatarUrl" alt="" />
+        <span v-else class="s-ava serif">
+          {{ authState.user ? (authState.user.nickname || '玩')[0] : '客' }}
+        </span>
+        <span class="s-nick">{{ authState.user ? authState.user.nickname : '登录' }}</span>
+      </button>
       <div class="mode-switch" role="radiogroup" aria-label="时间模式">
         <button :class="{ on: state.mode === 'manual' }" @click="setMode('manual')">演示</button>
         <button :class="{ on: state.mode === 'real' }" @click="setMode('real')">真实</button>
@@ -95,7 +115,27 @@ const deltaClass = (d) => (d > 0 ? 'good' : d < 0 ? 'bad' : 'zero')
   padding: 18px 18px 26px;
 }
 .s-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-.s-head .back { padding: 7px 14px; font-size: 13px; }
+
+/* 左上角：头像 + 昵称（替代原「回到此刻」，同操作在页底按钮） */
+.s-me {
+  display: inline-flex; align-items: center; gap: 8px;
+  border: none; background: none; font: inherit; cursor: pointer;
+  padding: 2px; min-width: 0;
+  margin: -5px 0; /* 40px 头像比右侧模式开关高一截，借页顶留白把行高压回 30px，下方内容不挪位 */
+  -webkit-tap-highlight-color: transparent;
+}
+.s-ava {
+  width: 40px; height: 40px; border-radius: 50%;
+  border: 1px solid var(--line); background: var(--mist);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; color: var(--ink); flex: none;
+  line-height: 1; overflow: hidden;
+}
+img.s-ava { display: block; object-fit: cover; }
+.s-nick {
+  font-size: 14px; color: var(--ink);
+  max-width: 8em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 
 .mode-switch {
   display: inline-flex;

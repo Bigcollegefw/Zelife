@@ -1,13 +1,21 @@
 <script setup>
 import { useRouter } from 'vue-router'
 import { useGame } from '../store.js'
+import { useAuth } from '../auth.js'
 
 const router = useRouter()
 const { state, startDay } = useGame()
+const { authState, openLogin } = useAuth()
 
 function begin() {
   startDay()
   router.push('/stage')
+}
+
+function onAuth() {
+  // 已登录 → 主页；未登录 → 登录弹层（登录成功后按钮自动变昵称）
+  if (authState.user) router.push('/me')
+  else openLogin()
 }
 </script>
 
@@ -39,9 +47,12 @@ function begin() {
       <div class="intro-sub">
         <button class="btn ghost small" @click="router.push('/editor')">编辑剧本</button>
         <button class="btn ghost small" @click="router.push('/letters')">夜记集</button>
+        <button class="btn ghost small intro-auth" @click="onAuth">
+          {{ authState.user ? authState.user.nickname : '登录' }}
+        </button>
       </div>
     </div>
-    <footer class="intro-foot">demo 原型 · 进度只保存在本机浏览器</footer>
+    <footer class="intro-foot">demo 原型 · 进度只保存在本机浏览器 · 登录不影响你的进度</footer>
   </div>
 </template>
 
@@ -57,6 +68,8 @@ function begin() {
 .intro-core { margin: auto 0; text-align: center; }
 .intro-sub { display: flex; justify-content: center; gap: 10px; margin-top: 14px; }
 .intro-sub .btn { padding: 7px 16px; font-size: 13px; }
+/* 昵称可能比固定文案长：限宽省略，防止三颗按钮挤换行 */
+.intro-auth { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mark {
   display: inline-block;
   width: 11px;

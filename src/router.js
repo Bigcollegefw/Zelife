@@ -6,6 +6,7 @@ import SummaryView from './views/SummaryView.vue'
 import EditorView from './views/EditorView.vue'
 import ReportView from './views/ReportView.vue'
 import LettersView from './views/LettersView.vue'
+import ProfileView from './views/ProfileView.vue'
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -21,14 +22,15 @@ const router = createRouter({
     { path: '/editor', component: EditorView },
     { path: '/report', component: ReportView },
     { path: '/letters', component: LettersView },
+    { path: '/me', component: ProfileView },
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
 })
 
-// 未开始的一天先进开场页（编辑剧本 / 夜记集不挡）
+// 未开始的一天先进开场页（编辑剧本 / 夜记集 / 我的主页不挡）
 router.beforeEach((to) => {
   const { state } = useGame()
-  if (!state.started && !['/intro', '/editor', '/letters'].includes(to.path)) return '/intro'
+  if (!state.started && !['/intro', '/editor', '/letters', '/me'].includes(to.path)) return '/intro'
 })
 
 export default router

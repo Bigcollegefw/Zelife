@@ -7,9 +7,35 @@
 
 ```bash
 npm install
-npm run dev      # 开发（默认 http://localhost:5173）
+npm run dev      # 前端开发（http://localhost:5173，/api 自动代理到 8787）
 npm run build    # 产出 dist/，可静态托管
+npm run api      # 账号后端：wrangler pages dev（:8787，本地 D1）
+npm run db:init  # 首次跑一次：本地 D1 建表
 ```
+
+手机真机调试：`npm run dev -- --host` 后用手机开 `http://<电脑局域网IP>:5173`（/api 由电脑侧代理，免 CORS）。
+
+## 账号系统（M1）
+
+邮箱验证码登录/注册（同一入口），只为后续「分享」服务——**本地剧本、照片、进度永远不要求登录、不上传**。后端 = Cloudflare Pages Functions + D1 + Resend，与本仓库同源（`functions/` 目录），开发全程零 CORS。
+
+开发环境一次性配置：
+
+1. `npm run db:init` 建本地表
+2. `.dev.vars`（已 gitignore）：`RESEND_API_KEY=` 填 [resend.com](https://resend.com) 的 API Key
+3. `DEV_FALLBACK=1`（默认已开）：不真发邮件，验证码直接填进输入框（仅本机请求生效，配到生产也不会泄露）
+4. 两个终端：`npm run api` + `npm run dev`，开场页右下「登录」进完整流程
+
+**版本注意**：wrangler 锁定 `4.85.0`（精确版本，无 `^`）——4.88 起要求 Node ≥22，本机 Node 20。升级 Node 后可放开。
+
+**主页 / 头像 / 昵称规范**：
+
+- 登录成功直接进个人页（`#/me`）；开场页第三钮：已登录→主页，未登录→登录弹层
+- 昵称 2–16 字，违禁词即拒（词库在 `functions/_lib/moderation.js`，想加词改那里）；注册默认「玩家」+4 位随机
+- 头像：点圆框选图 → **AvatarCropper 裁剪器**（双指缩放/单指拖动/双击复位，交互同 FitAdjust）→ 确认后本地裁成 256px JPEG → `PUT /api/me/avatar`（服务端魔法字节验格式、200KB 红线）；公开读取 `GET /api/users/:id/avatar?v=N`（仅 `avatar_status='ok'` 可见，immutable 缓存靠版本号失效）。⚠️ wrangler 本地 D1 把 BLOB 读成 `"255,216,..."` 十进制串，服务端 `blobToBytes()` 自适应归一（远端 D1 返回真 Uint8Array，两条路都保真）
+- 审核状态机：`avatar_status` = none / ok / blocked。M1 头像无公开场景 → 上传即 ok；M3 榜单公开头像时把默认改 pending 走「先审后发」。处置：`.dev.vars` 里 `ADMIN_TOKEN` → `curl -H "x-admin-token: <值>" localhost:8787/api/admin/avatars` 列表、`POST /api/admin/users/:id/avatar-status {"status":"blocked"}` 封禁（封后公开端 404，全员回退默认头像）
+
+**上线（M1.5，未执行）**：买域名接 Cloudflare DNS → Pages 连仓库部署（build=`npm run build`，`functions/` 自动生效）→ `wrangler d1 create galplan-db` 回填 `wrangler.toml` 的 `database_id` → `wrangler d1 execute DB --remote --file schema.sql` → 生产 secret 填 `RESEND_API_KEY`（**确认无 DEV_FALLBACK、无 ADMIN_TOKEN 泄露**）→ Resend 验证域名 SPF/DKIM → 绑自定义域名 → QQ/163/Gmail 真实投递测试 → 补隐私政策与用户协议。
 
 ## 玩法
 
@@ -41,10 +67,17 @@ src/
 ├─ night.js              # 夜记生成器（demo 本地模板，正式版换 LLM）
 ├─ photo.js              # 照片压缩（canvas → JPEG dataURL）
 ├─ store.js              # 预设库 + 单局状态 + localStorage 持久化
+├─ api.js                # API 客户端（全站唯一网络出口，相对路径 /api）
+├─ auth.js               # 账号状态 + 登录弹层（openLogin() → Promise，镜像 confirm.js）
 ├─ data/presets.js       # 内置预设：工作日 / 周末
 ├─ scenes-bg.js          # 自动收集 assets/scenes/ 里的照片
-├─ components/           # GloomMeter / DialogueBox / ChoiceList / EventCard(事件编辑卡)
+├─ components/           # GloomMeter / DialogueBox / ChoiceList / EventCard(事件编辑卡) / AuthSheet(登录弹层)
 └─ views/                # Intro / Stage(主对话流) / Summary / Editor(节点画布+聚焦编辑) / Report(夜记)
+
+functions/               # 账号后端（Cloudflare Pages Functions，M1）
+├─ api/[[route]].js      # API 单入口：request-code / verify / me / logout
+└─ _lib/                 # 工具与邮件（下划线目录不被当作路由）
+schema.sql               # D1 三表：users / auth_codes / sessions
 ```
 
 ## 路线图（demo 之后）

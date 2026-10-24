@@ -1,0 +1,11 @@
+# Cloudflare Pages 配置（M1 仅本地开发；上线步骤见 README「部署」一节）
+# 注意：有此文件时 wrangler 按 Pages 项目解析，pages_build_output_dir 为必需键
+name = "galplan"
+compatibility_date = "2025-08-01"
+pages_build_output_dir = "dist"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "galplan-db"
+# 纯本地开发不校验此 id；上线前跑 `npx wrangler d1 create galplan-db` 换成真值（需 wrangler login）
+database_id = "00000000-0000-0000-0000-000000000000"

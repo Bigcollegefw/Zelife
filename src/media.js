@@ -68,7 +68,8 @@ export function dropUrl(id) {
   urlCache.delete(id)
 }
 
-/* 背景描述符：旧 dataURL 字符串兼容为内联照片；对象 = { kind:'photo'|'video', id, loop?, poster? } */
+/* 背景描述符：旧 dataURL 字符串兼容为内联照片；
+   对象 = { kind:'photo'|'video', id, loop?, poster?, fit?, waitEnd?(视频播完再出选项) } */
 export const isMedia = (v) => !!v && typeof v === 'object' && !!v.kind
 
 /* 背景视频的体量与格式约定：浏览器端无法转码，只能原样存播，太大手机吃不消。
