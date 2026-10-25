@@ -16,7 +16,7 @@ const taEl = ref(null)
 // 列表 ⇄ 详情切换时回到顶部（页面滚动会保留上一状态的位置）
 watch(selId, () => window.scrollTo(0, 0))
 
-const backTo = computed(() => (state.started ? '/summary' : '/intro'))
+const backTo = computed(() => (state.started ? '/stage' : '/intro'))
 const sel = computed(() => letters.find((x) => x.id === selId.value) ?? null)
 const excerpt = (t) => (t ?? '').replace(/\s+/g, ' ').slice(0, 52) + '……'
 

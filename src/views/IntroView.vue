@@ -1,26 +1,20 @@
 <script setup>
 import { useRouter } from 'vue-router'
 import { useGame } from '../store.js'
-import { useAuth } from '../auth.js'
+import { openDrawer } from '../drawer.js'
 
 const router = useRouter()
 const { state, startDay } = useGame()
-const { authState, openLogin } = useAuth()
 
 function begin() {
   startDay()
   router.push('/stage')
 }
-
-function onAuth() {
-  // 已登录 → 主页；未登录 → 登录弹层（登录成功后按钮自动变昵称）
-  if (authState.user) router.push('/me')
-  else openLogin()
-}
 </script>
 
 <template>
   <div class="intro">
+    <button class="intro-menu" aria-label="菜单" @click="openDrawer()">☰</button>
     <div class="intro-core">
       <span class="mark" aria-hidden="true" />
       <div class="wordmark serif">galplan</div>
@@ -44,13 +38,6 @@ function onAuth() {
       <button class="btn primary big" @click="begin">
         {{ state.started ? '继续今天' : '开始今天' }}
       </button>
-      <div class="intro-sub">
-        <button class="btn ghost small" @click="router.push('/editor')">编辑剧本</button>
-        <button class="btn ghost small" @click="router.push('/letters')">夜记集</button>
-        <button class="btn ghost small intro-auth" @click="onAuth">
-          {{ authState.user ? authState.user.nickname : '登录' }}
-        </button>
-      </div>
     </div>
     <footer class="intro-foot">demo 原型 · 进度只保存在本机浏览器 · 登录不影响你的进度</footer>
   </div>
@@ -58,6 +45,7 @@ function onAuth() {
 
 <style scoped>
 .intro {
+  position: relative;
   min-height: 100vh; /* 兜底：不支持 dvh 的旧内核 */
   min-height: 100dvh;
   display: flex;
@@ -66,10 +54,21 @@ function onAuth() {
   padding: 56px 30px 26px;
 }
 .intro-core { margin: auto 0; text-align: center; }
-.intro-sub { display: flex; justify-content: center; gap: 10px; margin-top: 14px; }
-.intro-sub .btn { padding: 7px 16px; font-size: 13px; }
-/* 昵称可能比固定文案长：限宽省略，防止三颗按钮挤换行 */
-.intro-auth { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 左上角 ☰：全局抽屉入口，绝对定位不挤居中排版 */
+.intro-menu {
+  position: absolute;
+  top: 14px;
+  left: 16px;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 21px;
+  line-height: 1;
+  color: var(--ink);
+  cursor: pointer;
+  padding: 8px;
+  -webkit-tap-highlight-color: transparent;
+}
 .mark {
   display: inline-block;
   width: 11px;

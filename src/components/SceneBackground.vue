@@ -51,7 +51,8 @@ watch(
       kind.value = m.kind
       loop.value = m.kind === 'video' ? !!m.loop : false
       poster.value = m.poster ?? ''
-      url.value = (await mediaUrl(m.id)) ?? ''
+      // 远端形态 {kind, url}（M2 访客）与本地形态 {kind, id}（IndexedDB）双轨
+      url.value = m.url ?? (await mediaUrl(m.id)) ?? ''
     } else if (typeof m === 'string' && m) {
       kind.value = 'photo'
       url.value = m

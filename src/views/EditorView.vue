@@ -9,8 +9,17 @@ const router = useRouter()
 const {
   state, presets, activePreset, allNodes, nodesOf, isMerge,
   setActivePreset, createPreset, removePreset, reset,
-  removeNode, addNode, persistPresets,
+  removeNode, addNode, persistPresets, guest,
 } = useGame()
+
+/* 访客只读模式（M2 分享）：可进可看，拖拽/连线/增删/编辑全禁 */
+const roMode = computed(() => guest.on)
+
+/* 返回键：访客回作品落地页；本人回舞台（还没开始则回首页） */
+function backOut() {
+  if (guest.on && guest.work) router.push('/w/' + guest.work.code)
+  else router.push(state.started ? '/stage' : '/intro')
+}
 
 /* ══════════ 预设（画布头部） ══════════ */
 async function switchPreset(id) {
@@ -47,6 +56,7 @@ function loadExpandedMap() {
 const expandedMap = loadExpandedMap()
 const expandedIds = ref(new Set(expandedMap[activePreset.value.id] ?? []))
 function persistExpanded() {
+  if (roMode.value) return // 访客：展开态不落盘
   expandedMap[activePreset.value.id] = [...expandedIds.value]
   try {
     localStorage.setItem(EXPANDED_KEY, JSON.stringify(expandedMap))
@@ -105,6 +115,7 @@ function orderKey(n) {
   return m?.[n.id] != null ? m[n.id] : toMinutes(n.time)
 }
 function persistOrder() {
+  if (roMode.value) return // 访客：排序不落盘
   try {
     localStorage.setItem(ORDER_KEY, JSON.stringify(orderMap))
   } catch {
@@ -514,7 +525,7 @@ const dropSheet = ref(null) // { fromId, toId, sameRow }
 const edgeSheet = ref(null) // { fromId, toId, nums }
 
 function onHandleDown(e, n) {
-  if (drag.value || focusOn.value || focusId.value) return
+  if (roMode.value || drag.value || focusOn.value || focusId.value) return
   if (e.pointerType === 'mouse' && e.button !== 0) return
   const el = nodeEls[n.id]
   if (!el) return
@@ -644,7 +655,7 @@ function doConnect(idx) {
 
 /* ---------- 断开连线（点箭头序号） ---------- */
 function openEdgeSheet(fromId, toId, nums) {
-  if (drag.value) return
+  if (roMode.value || drag.value) return
   edgeSheet.value = { fromId, toId, nums: [...nums] }
 }
 
@@ -656,6 +667,7 @@ function breakEdge(idx) {
 
 /* ---------- 画布直接新增节点（独立节点，拖拽连线接入剧情） ---------- */
 function addNodeFromCanvas() {
+  if (roMode.value) return
   const id = addNode(presets.activeId)
   if (!id) return
   relayout() // 渲染前先占好槽位，避免新卡闪到画布左上角再飞回来
@@ -814,6 +826,7 @@ function onNodeTap(n) {
 const scopeNode = computed(() => (focusId.value ? nodesOf.value[focusId.value] : null))
 
 async function delScene(sc) {
+  if (roMode.value) return
   if (!(await confirmBox(`删除「${sc.time} ${sc.title}」？`, { body: '指向它的决策会改接到它的后继。', danger: true }))) return
   const wasScope = sc.id === focusId.value
   removeNode(presets.activeId, sc.id)
@@ -883,17 +896,17 @@ function isTerminal(n) {
     <!-- ════════ 画布总览 ════════ -->
     <div class="ed-canvas">
       <header class="e-head">
-        <button class="btn ghost back" @click="router.push('/summary')">‹ 汇总</button>
+        <button class="btn ghost back" @click="backOut">‹ 返回</button>
         <div class="e-title serif">剧本节点</div>
         <button
-          v-if="presets.list.length > 1"
+          v-if="!ro && presets.list.length > 1"
           class="e-linkdel"
           @click="delPreset"
         >删除预设</button>
-        <span v-else class="e-linkdel off">删除预设</span>
+        <span v-else-if="!roMode" class="e-linkdel off">删除预设</span>
       </header>
 
-      <div class="e-presets">
+      <div v-if="!roMode" class="e-presets">
         <button
           v-for="p in presets.list"
           :key="p.id"
@@ -907,16 +920,15 @@ function isTerminal(n) {
         <button class="p-chip" title="收起全部展开的节点" @click="collapseAll">收起全部</button>
       </div>
 
-      <div v-if="creating" class="e-newp">
+      <div v-if="!ro && creating" class="e-newp">
         <input v-model="newName" class="fi" placeholder="新预设名，如：周末" @keyup.enter="createFromCurrent" />
         <button class="btn ghost" @click="createFromCurrent">复制「{{ activePreset.name }}」创建</button>
       </div>
 
       <p class="e-hint">
-        画布按时刻分行：同一时刻的备选并排（可互换位置），箭头只能指向更晚的时刻。
-        点小卡进入节点编辑；点箭头上的 ①② 可断开连线。
+        画布按时刻分行：同一时刻的备选并排，箭头指向更晚的时刻。点小卡聚焦查看节点内部。
       </p>
-      <p class="e-hint" style="margin-top: -4px">
+      <p v-if="!roMode" class="e-hint" style="margin-top: -4px">
         按住 ⠿ 拖动小卡：到同时刻卡上＝互换位置；到更晚的卡上＝把决策连过去；拖到底部红区＝删除节点。
         底部「＋ 新增节点」先造独立节点，再连入剧情。
       </p>
@@ -954,7 +966,7 @@ function isTerminal(n) {
                 @click.stop="toggleExpand(n)"
               >{{ isExpanded(n) ? '⤡' : '⤢' }}</button>
               <button
-                v-if="!isExpanded(n)"
+                v-if="!roMode && !isExpanded(n)"
                 class="n-drag"
                 title="拖动：交换位置 / 决策连线 / 拖到底部删除"
                 @pointerdown="onHandleDown($event, n)"
@@ -963,7 +975,7 @@ function isTerminal(n) {
               <template v-if="isExpanded(n)">
                 <button class="n-zoom" title="聚焦进这个节点" @click.stop="focusNode(n)">⤢</button>
                 <div class="cnode-ed" @click.stop>
-                  <EventCard :scene="n" mini @delete="delScene" />
+                  <EventCard :scene="n" mini :ro="roMode" @delete="delScene" />
                 </div>
               </template>
               <template v-else>
@@ -979,7 +991,7 @@ function isTerminal(n) {
 
             <!-- 画布直接新增节点：独立节点，之后拖拽连线接入剧情 -->
             <button
-              v-if="!focusing"
+              v-if="!ro && !focusing"
               class="cnode add-card"
               :style="{ left: (canvasW - CARD_W) / 2 + 'px', top: layout.addY + 'px', width: CARD_W + 'px' }"
               @click="addNodeFromCanvas"
@@ -1058,7 +1070,7 @@ function isTerminal(n) {
         class="focus-body"
         :class="{ 'zoomin-start': zoominStart, zoomout }"
       >
-        <EventCard v-if="scopeNode" class="focus-card first" :scene="scopeNode" @delete="delScene" />
+        <EventCard v-if="scopeNode" class="focus-card first" :scene="scopeNode" :ro="roMode" @delete="delScene" />
       </div>
     </div>
 

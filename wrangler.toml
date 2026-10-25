@@ -9,3 +9,9 @@ binding = "DB"
 database_name = "galplan-db"
 # 纯本地开发不校验此 id；上线前跑 `npx wrangler d1 create galplan-db` 换成真值（需 wrangler login）
 database_id = "00000000-0000-0000-0000-000000000000"
+
+# M2 分享媒体：照片/视频进 R2（免费 10GB，零出网费）；本地 dev 用模拟桶，无需真实账号
+[[r2_buckets]]
+binding = "MEDIA"
+bucket_name = "galplan-media"
+preview_bucket_name = "galplan-media-preview"

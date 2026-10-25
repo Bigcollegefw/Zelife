@@ -43,7 +43,7 @@ export function nightNote(log, scenes, tierKey, dateLabel) {
     const time = entry.snap?.time ?? scene?.time ?? ''
     const title = entry.snap?.title ?? scene?.title ?? ''
 
-    if (entry.missed) {
+    if (entry.missed && !entry.late) {
       lines.push(`${time}，${title}，没有等到你的回答，无声地散在了那天的光线里。`)
       continue
     }
@@ -55,6 +55,16 @@ export function nightNote(log, scenes, tierKey, dateLabel) {
       /[。．.、，,\s]+$/,
       '',
     )
+    if (entry.late) {
+      // 补做的回答：单独句式，不进轮换池——迟来说的是真话
+      lines.push(
+        reflect
+          ? `${time}，${title}，迟来的回答是「${choiceText}」。${reflect}。`
+          : `${time}，${title}，迟来的回答是「${choiceText}」。`,
+      )
+      i += 1
+      continue
+    }
     const verb = VERBS[i % VERBS.length].replace('%s', choiceText)
     lines.push(reflect ? `${time}，${title}，${verb}。${reflect}。` : `${time}，${title}，${verb}。`)
     i += 1

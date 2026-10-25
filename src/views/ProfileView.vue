@@ -1,11 +1,12 @@
 <script setup>
 /* 玩家主页（我的）。v1：头像占位 + 昵称可改 + 邮箱/加入天数 + 作品/榜单占位 + 退出登录。
    未登录直进此页给登录入口（initAuth 在 App.vue onMounted 已乐观恢复本地 token）。 */
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth, openLogin, updateNickname, logout, uploadAvatar } from '../auth.js'
 import { confirmBox } from '../confirm.js'
 import { useGame } from '../store.js'
+import { openShare, shareState, myWorks } from '../share.js'
 import { fileToDataUrl } from '../photo.js'
 import { dataUrlToBlob } from '../media.js'
 import AvatarCropper from '../components/AvatarCropper.vue'
@@ -14,7 +15,7 @@ const router = useRouter()
 const { state } = useGame()
 const { authState } = useAuth()
 
-const backTo = computed(() => (state.started ? '/summary' : '/intro'))
+const backTo = computed(() => (state.started ? '/stage' : '/intro'))
 const user = computed(() => authState.user)
 const joinedDays = computed(() => {
   if (!user.value?.created_at) return null
@@ -62,6 +63,24 @@ async function commitNick() {
     pending.value = false
   }
 }
+
+/* 分享记录：作品行显示「N 个作品 · M 个分享中」，点行打开分享管理弹层 */
+const workTotal = ref(null) // null=还没拉到 / 未登录
+const workActive = ref(0)
+async function loadWorks() {
+  if (!authState.user) return
+  try {
+    const { list } = await myWorks()
+    workTotal.value = list.length
+    workActive.value = list.filter((w) => w.status === 'active').length
+  } catch {
+    workTotal.value = null // 拉失败不挡主页，行文案退回邀请语
+  }
+}
+onMounted(loadWorks)
+watch(() => shareState.open, (open) => {
+  if (!open) loadWorks() // 弹层里分享/停用/删除后回来，计数即刷
+})
 
 /* 头像：点圆框选图 → 压成 256px JPEG → 上传；服务端版本号变了 URL 自动换新图 */
 const avatarInput = ref(null)
@@ -166,8 +185,13 @@ async function doLogout() {
         <div v-if="joinedDays" class="me-joined">加入第 {{ joinedDays }} 天</div>
 
         <ul class="me-list">
-          <li>
-            <i>作品</i><span>把你的剧本分享给朋友 <b class="soon">· M2 敬请期待</b></span>
+          <li class="me-tap" @click="openShare()">
+            <i>作品</i>
+            <span>
+              <template v-if="workTotal">{{ workTotal }} 个作品 · {{ workActive }} 个分享中</template>
+              <template v-else>把你的剧本分享给朋友</template>
+              <b class="soon"> ›</b>
+            </span>
           </li>
           <li>
             <i>榜单</i><span>看看大家都在过怎样的一天 <b class="soon">· M3 敬请期待</b></span>
@@ -267,6 +291,8 @@ img.me-avatar { display: block; object-fit: cover; }
   font-size: 14px; letter-spacing: 0.2em; color: var(--ink);
 }
 .me-list span { font-size: 13px; color: var(--ink-2); line-height: 1.8; }
+.me-tap { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.me-tap:active { background: var(--mist); }
 .soon { font-weight: normal; color: var(--ink-3); font-size: 11px; }
 
 .me-out { margin-top: 30px; }

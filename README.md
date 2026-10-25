@@ -37,6 +37,22 @@ npm run db:init  # 首次跑一次：本地 D1 建表
 
 **上线（M1.5，未执行）**：买域名接 Cloudflare DNS → Pages 连仓库部署（build=`npm run build`，`functions/` 自动生效）→ `wrangler d1 create galplan-db` 回填 `wrangler.toml` 的 `database_id` → `wrangler d1 execute DB --remote --file schema.sql` → 生产 secret 填 `RESEND_API_KEY`（**确认无 DEV_FALLBACK、无 ADMIN_TOKEN 泄露**）→ Resend 验证域名 SPF/DKIM → 绑自定义域名 → QQ/163/Gmail 真实投递测试 → 补隐私政策与用户协议。
 
+## 分享（M2 私有链接）
+
+登录后把当前剧本分享成一条链接，对方在微信/QQ/浏览器里点开即可完整体验（演出 + 回看）+ 只读画布，**无需安装任何东西**。
+
+- **入口**：汇总页「分享此剧本」或个人主页「作品」行 → 弹层里复制链接；同一弹层可管理历史分享（复制 / 停用↔恢复 / 删除，带浏览数）
+- **访客隔离**：访客打开 `#/w/:码` 进沙箱——剧本与进度全在内存，不写本机任何数据，关页即散；夜记体验版不存档
+- **访客空间**：整个访客流程关在 `#/w/:码/*` 下（stage/summary/report/editor），URL 永远标识作品；每次翻页向服务器确认作品仍开放（`GET /api/works/:码/status`）——**作者停用后：新访客进不来、已打开的访客一翻页即被请离**（正在播的当前一幕内容已在对方设备上，无法中途收回）
+- **配额**：单作品媒体 ≤50MB / ≤48 个文件；每人最多 5 个进行中的分享（服务端强制）
+- **媒体**：照片/视频上传进 Cloudflare R2（本地 dev 用模拟桶），经 `GET /api/media/:码/:槽` 读取（immutable 缓存 + Range 206，iOS 视频 seek 正常）
+- **停用**：链接变「作者已关闭分享」，可随时恢复；删除则行与 R2 对象一并清除
+- **浏览计数**：每次打开 +1，同 IP/用户每天只记一次（play_events 表，M3 榜单排序的数据基础）
+- **举报**：访客页右上角 ⚑ → 底部弹层，流水进 reports 表（处置界面随 M3）
+- **作者打开自己的链接**：访客页显示「这是你分享的作品 · 管理」，体验与访客一致
+
+开发环境追加一次：`npm run db:init`（新增 works / play_events / reports 三张表，IF NOT EXISTS 幂等）。R2 绑定已配在 wrangler.toml（本地模拟，无需真实账号）；上线时创建真桶并回填 bucket_name。
+
 ## 玩法
 
 - **主界面即对话**：整个 app 保持 galgame 的对话流——过场卡 → 旁白打字机 → 居中选项 → 选择反馈 → 轻触继续进入下一时刻，全程不跳出对话界面

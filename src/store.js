@@ -67,7 +67,7 @@ if (savedPresets && !savedPresets.moodV2) {
   }
   savedPresets.moodV2 = true
 }
-const presets = reactive(
+const localPresets = reactive(
   savedPresets ?? {
     activeId: BUILTIN_PRESETS[0].id,
     list: JSON.parse(JSON.stringify(BUILTIN_PRESETS)),
@@ -75,8 +75,9 @@ const presets = reactive(
   },
 )
 
-// 迁移与规范化：v1 线性 scenes[] → v2 图 nodes{}；补齐 intros / choice.effect
-for (const p of presets.list) {
+/** 补齐结构：v1 线性 scenes[] → v2 图 nodes{}；intros 数组化；choice.effect 对象化。
+    本地预设加载与访客沙箱共用（远端剧本不保证字段齐全）。 */
+function normalizePreset(p) {
   if (!p.nodes || !p.start) {
     const scenes = [...(p.scenes ?? [])].sort((a, b) => toMinutes(a.time) - toMinutes(b.time))
     p.nodes = {}
@@ -98,6 +99,73 @@ for (const p of presets.list) {
       if (!c.effect || typeof c.effect !== 'object') c.effect = { text: '', photo: null }
     }
   }
+  return p
+}
+
+for (const p of localPresets.list) normalizePreset(p)
+
+/* ---------- 访客沙箱（M2 分享） ----------
+   打开分享链接：剧本与单局全部走内存，不写本地任何键（关页即散）。
+   presets / state 经代理指向当前数据源，视图层零改动即可工作；
+   persist* 在访客态一律 no-op，杜绝污染本地存档。 */
+export const guest = reactive({ on: false, work: null }) // work = { code, title, nickname, owner_id }
+
+const guestPresets = reactive({ activeId: '__guest', list: [], moodV2: true })
+const guestState = reactive({
+  started: false,
+  mode: 'manual', // 访客固定演示推进：完整体验一次别人的「一天」
+  gloom: STATE_START,
+  date: null,
+  log: [],
+  moodV2: true,
+})
+
+const srcOfKey = (k) => (guest.on ? (k === 'p' ? guestPresets : guestState) : k === 'p' ? localPresets : localState)
+
+const presets = new Proxy({}, {
+  get: (_, k) => srcOfKey('p')[k],
+  set: (_, k, v) => {
+    srcOfKey('p')[k] = v
+    return true // Proxy 规范：set 陷阱必须返回布尔，返回赋值表达式会把 falsy 值变成 TypeError
+  },
+  has: (_, k) => k in srcOfKey('p'),
+  deleteProperty: (_, k) => delete srcOfKey('p')[k],
+})
+const state = new Proxy({}, {
+  get: (_, k) => srcOfKey('s')[k],
+  set: (_, k, v) => {
+    srcOfKey('s')[k] = v
+    return true
+  },
+  has: (_, k) => k in srcOfKey('s'),
+  deleteProperty: (_, k) => delete srcOfKey('s')[k],
+})
+
+/** 进入访客模式：全量重置沙箱，挂上远端剧本（媒体描述符为 {kind,url} 远端形态）。
+    document.title 换成作品名（微信分享卡片标题取它），离开访客模式时还原 */
+export function enterGuestWork(work, presetRaw) {
+  guest.work = work
+  guest.on = true
+  const p = normalizePreset(JSON.parse(JSON.stringify(presetRaw ?? {})))
+  p.id = '__guest'
+  p.name = work.title
+  guestPresets.list = [p]
+  guestPresets.activeId = '__guest'
+  Object.assign(guestState, {
+    started: false,
+    mode: 'manual',
+    gloom: STATE_START,
+    date: null,
+    log: [],
+  })
+  document.title = `${work.title} · galplan`
+}
+
+/** 离开访客模式（访客页「退出」）：恢复本地数据源与页面标题 */
+export function exitGuest() {
+  guest.on = false
+  guest.work = null
+  document.title = 'galplan · 把一天过成一场游戏'
 }
 
 const activePreset = computed(
@@ -118,7 +186,8 @@ const inDegree = computed(() => {
 })
 
 export function persistPresets() {
-  saveJson(PRESETS_KEY, { activeId: presets.activeId, list: presets.list, moodV2: true })
+  if (guest.on) return // 访客沙箱：剧本只存内存
+  saveJson(PRESETS_KEY, { activeId: localPresets.activeId, list: localPresets.list, moodV2: true })
 }
 
 function patchScene(presetId, nodeId, patch) {
@@ -248,7 +317,7 @@ if (savedRun && !savedRun.moodV2) {
   savedRun.moodV2 = true
 }
 
-const state = reactive({
+const localState = reactive({
   started: savedRun?.started ?? false,
   mode: savedRun?.mode ?? 'manual', // 'manual' 演示推进 | 'real' 真实时间
   gloom: savedRun?.gloom ?? STATE_START,
@@ -258,18 +327,20 @@ const state = reactive({
   moodV2: true,
 })
 
+const loggedIds = computed(() => new Set(state.log.map((e) => e.sceneId)))
+
+/* 访客沙箱：本地持久化全部禁写 */
 function persistRun() {
+  if (guest.on) return
   saveJson(RUN_KEY, {
-    started: state.started,
-    mode: state.mode,
-    gloom: state.gloom,
-    date: state.date,
-    log: state.log,
+    started: localState.started,
+    mode: localState.mode,
+    gloom: localState.gloom,
+    date: localState.date,
+    log: localState.log,
     moodV2: true,
   })
 }
-
-const loggedIds = computed(() => new Set(state.log.map((e) => e.sceneId)))
 
 /** 错过 = 顺流而下：走向状态掉得最狠的那个选项 */
 function driftNext(node) {
@@ -375,6 +446,20 @@ function choose(scene, choiceIndex) {
   return applied
 }
 
+/** 回看补做：为顺流而去的时刻补上回答。只改记录，不动机制——
+    missed 保持 true（frontierOf 仍按顺流路线走），delta 不退还，late 标记迟到；
+    补做后不可改选。 */
+function backfill(sceneId, choiceIndex) {
+  const entry = state.log.find((e) => e.sceneId === sceneId && e.missed && !e.late)
+  const node = nodesOf.value[sceneId]
+  const choice = node?.choices?.[choiceIndex]
+  if (!entry || !choice) return
+  entry.choiceIndex = choiceIndex
+  entry.late = true
+  entry.snap = { ...(entry.snap ?? {}), choiceText: choice.text, reflect: snapOf(node, choice).reflect }
+  persistRun()
+}
+
 function startDay() {
   if (!state.started) {
     state.started = true
@@ -400,10 +485,12 @@ export function useGame() {
   return {
     // 运行状态
     state, frontier, finished, tier,
-    isEnterable, catchUp, choose, startDay, reset: resetRun, setMode,
+    isEnterable, catchUp, choose, backfill, startDay, reset: resetRun, setMode,
     // 剧本库（图）
     presets, activePreset, allNodes, nodesOf, defaultPath, isMerge,
     persistError, persistPresets,
     patchScene, addNode, removeNode, appendMoment, createPreset, removePreset, setActivePreset,
+    // 访客沙箱（M2 分享）
+    guest, enterGuestWork, exitGuest,
   }
 }

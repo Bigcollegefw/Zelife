@@ -1,6 +1,6 @@
 <script>
 // 舞台记忆：离开舞台（去汇总）时记住停在哪，回来直接续上、不重放过场卡
-const memory = { activeId: null, phase: '', logLen: -1 }
+const memory = { activeId: null, phase: '', logLen: -1, guest: false }
 </script>
 
 <script setup>
@@ -16,9 +16,10 @@ import DialogueBox from '../components/DialogueBox.vue'
 import ChoiceList from '../components/ChoiceList.vue'
 import SceneBackground from '../components/SceneBackground.vue'
 import TimingSheet from '../components/TimingSheet.vue'
+import { openDrawer } from '../drawer.js'
 
 const router = useRouter()
-const { state, presets, activePreset, frontier, tier, isEnterable, choose, catchUp, patchScene, persistPresets } =
+const { state, presets, activePreset, frontier, tier, isEnterable, choose, backfill, catchUp, patchScene, persistPresets, guest } =
   useGame()
 
 /* ---------- 推进状态机 ---------- */
@@ -68,6 +69,11 @@ const intros = computed(() =>
 )
 const introText = computed(() => intros.value[introIndex.value]?.text?.trim() ?? '')
 const introBg = computed(() => intros.value[introIndex.value]?.photo ?? '') // dataURL 或视频描述符
+
+/* 访客空间跳转：访客的 汇总/夜记 走 /w/:code/*，本人走原路由 */
+function nav(path) {
+  router.push((guest.on && guest.work ? '/w/' + guest.work.code : '') + path)
+}
 
 function beginScene(scene) {
   activeId.value = scene.id
@@ -203,12 +209,23 @@ function enterFinale() {
   phase.value = 'finale'
 }
 
-/* ---------- 追赶摘要：合流之前顺流而去的时刻，一句旁白带过 ---------- */
+/* ---------- 追赶摘要：合流之前顺流而去的时刻，一句旁白带过。
+   文案是响应式的：回看里补做后，「真没回答」的剩余数实时变化 ---------- */
+const missedShown = ref(0) // 摘要初次弹出时的顺流数（补做后数量变少即换措辞）
+const trueMissedCount = computed(() => state.log.filter((e) => e.missed && !e.late).length)
+const missedSummary = computed(() => {
+  const n = trueMissedCount.value
+  if (!n) return ''
+  const fresh = n === missedShown.value
+  return `（有 ${n} 个时刻${fresh ? '没有' : '还没有'}等到你的回答，顺流而去了。${fresh ? `状态 ${n * MISSED_DELTA}。` : ''}）`
+})
+
 function showMissedSummary(count) {
+  missedShown.value = count
   dialogueTag.value = '时间'
-  dialogue.value = `（有 ${count} 个时刻没有等到你的回答，顺流而去了。状态 ${count * MISSED_DELTA}。）`
   lastDelta.value = count * MISSED_DELTA
   deltaKey.value++
+  animateGloom() // 状态值已被追赶扣过：顶栏药片同步动画，否则停在旧值
   phase.value = 'missed'
 }
 
@@ -223,7 +240,7 @@ onMounted(() => {
   const f = frontier.value
   if (r.missed > 0) {
     showMissedSummary(r.missed)
-  } else if (f && memory.phase === 'choose' && memory.activeId === f.id && memory.logLen === state.log.length) {
+  } else if (f && memory.phase === 'choose' && memory.activeId === f.id && memory.logLen === state.log.length && memory.guest === guest.on) {
     // 从汇总回来：停在同一个未选的时刻 → 直接续上，不重放过场卡
     resumeScene(f)
   } else {
@@ -249,6 +266,7 @@ watch(
     memory.activeId = activeId.value
     memory.phase = phase.value
     memory.logLen = state.log.length
+    memory.guest = guest.on
   },
   { immediate: true },
 )
@@ -423,6 +441,7 @@ const rpPos = ref(0) // rpTimeline 下标
 const rpDbRef = ref(null)
 const canReplay = computed(() => state.log.length > 0)
 const showReplayCtl = canReplay // 任何一幕都能进回看，落点跟着当下所在的幕走
+const canBackfill = computed(() => !!frontier.value) // 当天未走完才能补做（走完夜记已生成，不再收回答）
 
 // 时间线：每段引子一步、每次决定两步（选择现场 + 效果过场）、错过一步；
 // 尽头是「此刻」尾巴——当下这幕已经看过的引子（没做的选择不进回看），今天走完则补一步结局
@@ -432,8 +451,9 @@ const rpTimeline = computed(() => {
     const node = activePreset.value.nodes[e.sceneId] ?? null
     const intros = (node?.intros ?? []).filter((it) => (it.text ?? '').trim() || it.photo)
     intros.forEach((it, i) => steps.push({ kind: 'intro', e, ei, node, sceneId: e.sceneId, it, i, n: intros.length }))
-    steps.push({ kind: e.missed ? 'missed' : 'choose', e, ei, node, sceneId: e.sceneId })
-    if (!e.missed && node) steps.push({ kind: 'effect', e, ei, node, sceneId: e.sceneId })
+    // 补做（late）的条目按已选重演：选择现场 + 效果过场；真错过（missed 且未补）只有一步
+    steps.push({ kind: e.missed && !e.late ? 'missed' : 'choose', e, ei, node, sceneId: e.sceneId })
+    if ((!e.missed || e.late) && node) steps.push({ kind: 'effect', e, ei, node, sceneId: e.sceneId })
   })
   const f = frontier.value
   if (f) {
@@ -490,6 +510,20 @@ function rpJumpEntry(i) {
   if (at >= 0) rpPos.value = at
 }
 
+/** 回看补做：给顺流而去的时刻补上回答。条目翻转为 late 后，
+    当前步原地变选择现场（高亮补做的选项），轻触继续会走效果过场 */
+function rpBackfill(i) {
+  const s = rpStep.value
+  if (!s || !canBackfill.value) return
+  backfill(s.sceneId, i)
+}
+
+/* 回看里把错过的全部补完：退出回看时摘要页已无存在的意义，直接落到当前时刻 */
+watch([replayOn, trueMissedCount], ([on]) => {
+  if (on || phase.value !== 'missed' || trueMissedCount.value > 0) return
+  settle()
+})
+
 /** 轻触推进，与正常演出一致：先补全打字，再下一段 */
 function rpAdvance() {
   if (rpDbRef.value?.isTyping?.()) {
@@ -544,11 +578,15 @@ const rpEffectText = computed(() => {
   return (c?.effect?.text?.trim() || c?.feedback || '').trim()
 })
 const rpReflect = computed(() => rpStep.value?.e?.snap?.reflect ?? '')
-const rpMissedText = computed(() =>
-  rpStep.value?.kind === 'missed'
-    ? `（这个时刻没有等到你的回答，顺流而去了。状态 ${fmtDelta(rpStep.value.e.delta)}。）`
-    : '',
+/* 补做可用性：当天未走完、当前步是未补的错过步、且该节点有选项可选 */
+const rpCanPick = computed(
+  () => canBackfill.value && rpStep.value?.kind === 'missed' && !!rpStep.value.node?.choices?.length,
 )
+const rpMissedText = computed(() => {
+  if (rpStep.value?.kind !== 'missed') return ''
+  if (rpCanPick.value) return '这个时刻已经过去，你的回答迟到了。要现在补上吗？'
+  return `（这个时刻没有等到你的回答，顺流而去了。状态 ${fmtDelta(rpStep.value.e.delta)}。）`
+})
 const rpFinaleText = computed(() => `一天到此为止。${tier.value.label}——${tier.value.phrase}。`)
 /* 底部小标签：现在翻到第几个节点（与页签一一对应） */
 const rpWhere = computed(() => {
@@ -557,7 +595,7 @@ const rpWhere = computed(() => {
   if (s.kind === 'finale') return '一日终了'
   const seg = s.kind === 'intro' ? ` · 引子 ${s.i + 1}/${s.n}` : ''
   if (s.now) return `此刻${seg}`
-  return `回看 ${(s.ei ?? 0) + 1} / ${rpNodeCount.value}${seg}`
+  return `回溯 ${(s.ei ?? 0) + 1} / ${rpNodeCount.value}${seg}`
 })
 const showDeltaFloat = computed(() =>
   deltaKey.value > 0 && ['effect', 'missed'].includes(phase.value),
@@ -580,12 +618,12 @@ const deltaClass = computed(() =>
     <div class="scene-fog" :style="{ opacity: fogOpacity }" />
 
     <header class="stage-top">
-      <button class="chip ghost" @click.stop="router.push('/summary')">☰ 汇总</button>
+      <button class="chip ghost stage-menu" aria-label="菜单" @click.stop="openDrawer()">☰</button>
       <span class="chip">{{ topLabel }}</span>
       <GloomMeter :value="displayGloom" :tier="tier" compact class="grow" />
     </header>
 
-    <div v-if="showPhotoCtl" class="stage-photo-ctl" :class="{ down: showReplayCtl }">
+    <div v-if="showPhotoCtl && !guest.on" class="stage-photo-ctl" :class="{ down: showReplayCtl }">
       <template v-if="phase === 'finale'">
         <button class="chip ghost small" @click.stop="onFinalePhotoBtn">
           {{ !finaleMedia ? '换背景（图/视频）' : finaleIsVideo ? '移除视频' : '移除照片' }}
@@ -608,9 +646,9 @@ const deltaClass = computed(() =>
       <input ref="finalePhotoEl" type="file" accept="image/*,video/*" hidden @click.stop @change="pickBgFile('finale', $event)" />
     </div>
     <!-- 上传视频背景后的「选项时机」弹层（内部 Teleport 到 body） -->
-    <TimingSheet v-if="timingSheet" @pick="applyWaitEnd" @close="timingSheet = false" />
+    <TimingSheet v-if="timingSheet && !guest.on" @pick="applyWaitEnd" @close="timingSheet = false" />
     <!-- 回看入口：任何一幕都在，进回看时落在当前这一幕 -->
-    <button v-if="showReplayCtl" class="chip ghost small rp-enter" @click.stop="enterReplay">‹ 回看</button>
+    <button v-if="showReplayCtl" class="chip ghost small rp-enter" @click.stop="enterReplay">‹ 回溯</button>
 
     <div v-if="showDeltaFloat" :key="deltaKey" class="delta-float" :class="deltaClass">
       状态 {{ fmtDelta(lastDelta) }}
@@ -648,7 +686,7 @@ const deltaClass = computed(() =>
           <div class="in-line" />
           <div class="in-title serif">{{ activeScene?.title }}</div>
         </template>
-        <div class="in-tools">
+        <div v-if="!guest.on" class="in-tools">
           <button class="chip dark small" @click.stop="introPhotoEl?.click()">换引子背景</button>
         </div>
         <div class="in-hint">轻触继续</div>
@@ -681,7 +719,7 @@ const deltaClass = computed(() =>
           @done="effectDone = true"
         />
         <div class="in-tools two">
-          <button class="chip dark small" @click.stop="effectPhotoEl?.click()">换效果背景</button>
+          <button v-if="!guest.on" class="chip dark small" @click.stop="effectPhotoEl?.click()">换效果背景</button>
           <button
             v-if="effectDone || !effectText"
             class="chip dark small go"
@@ -704,15 +742,15 @@ const deltaClass = computed(() =>
     </div>
 
     <footer class="stage-bottom">
-      <DialogueBox ref="dbRef" :text="dialogue" :tag="dialogueTag" />
+      <DialogueBox ref="dbRef" :text="phase === 'missed' ? missedSummary : dialogue" :tag="dialogueTag" />
       <div v-if="phase === 'missed'" class="under">
         <button class="btn primary" @click.stop="advance">继续 ▸</button>
       </div>
       <div v-else-if="phase === 'waiting'" class="under">
-        <button class="btn ghost" @click.stop="router.push('/summary')">查看汇总</button>
+        <button class="btn ghost" @click.stop="openDrawer()">查看汇总</button>
       </div>
       <div v-else-if="phase === 'finale'" class="under">
-        <button class="btn primary" @click.stop="router.push('/report')">查看今日总结 ›</button>
+        <button class="btn primary" @click.stop="nav('/report')">查看今日总结 ›</button>
       </div>
     </footer>
 
@@ -723,6 +761,7 @@ const deltaClass = computed(() =>
         <template v-if="rpStep.kind === 'choose'">
           <SceneBackground :media="rpMedia" :bg-key="rpBgKey" :replay="'rp:' + rpPos" class="rp-scene" />
           <div class="rp-choose">
+            <span v-if="rpStep.e?.late" class="rp-late">补做</span>
             <div class="stage-choices">
               <ChoiceList :choices="rpChoices" :chosen="rpChosen" readonly />
             </div>
@@ -758,18 +797,22 @@ const deltaClass = computed(() =>
           </div>
           <DialogueBox v-if="rpEffectText" :key="'e' + rpPos" ref="rpDbRef" variant="bare" :text="rpEffectText" :speed="38" />
           <p class="rp-delta" :class="rpStep.e.delta > 0 ? 'good' : rpStep.e.delta < 0 ? 'bad' : 'zero'">
-            状态 {{ fmtDelta(rpStep.e.delta) }}
+            状态 {{ fmtDelta(rpStep.e.delta) }}<template v-if="rpStep.e?.late">（顺流时已计入）</template>
           </p>
           <p v-if="rpReflect" class="rp-reflect">{{ rpReflect }}</p>
         </div>
 
-        <!-- 错过：顺流而去的时刻 -->
+        <!-- 错过：顺流而去的时刻。当天未走完时可当场补上回答（补做） -->
         <div v-else-if="rpStep.kind === 'missed'" class="interlude" :class="{ 'has-photo': !!rpMedia }">
           <SceneBackground v-if="rpMedia" :media="rpMedia" :bg-key="rpBgKey" :replay="'rp:' + rpPos" class="in-bg" />
           <div class="in-time serif">{{ rpTime }}</div>
           <div class="in-line" />
           <div class="in-title serif">{{ rpTitle }}</div>
           <DialogueBox :key="'m' + rpPos" ref="rpDbRef" variant="bare" :text="rpMissedText" :speed="38" />
+          <div v-if="rpCanPick" class="rp-backfill" @click.stop>
+            <ChoiceList :choices="rpStep.node?.choices ?? []" @choose="rpBackfill" />
+          </div>
+          <div v-else-if="rpStep.node?.choices?.length" class="in-hint">轻触继续</div>
         </div>
 
         <!-- 结局：一天走完时的收尾 -->
@@ -860,6 +903,12 @@ const deltaClass = computed(() =>
   padding: calc(14px + env(safe-area-inset-top)) 16px 10px;
 }
 .grow { margin-left: auto; }
+/* ☰ 抽屉入口：方形一点，手指点按友好 */
+.stage-menu {
+  font-size: 14px;
+  padding: 5px 13px 5px;
+  line-height: 1;
+}
 .chip {
   font: inherit;
   font-size: 12px;
@@ -1003,6 +1052,25 @@ const deltaClass = computed(() =>
   display: flex;
   flex-direction: column;
   padding-bottom: calc(152px + env(safe-area-inset-bottom));
+}
+/* 补做徽标 */
+.rp-late {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  color: rgba(245, 241, 232, 0.85);
+  border: 1px solid rgba(245, 241, 232, 0.4);
+  border-radius: 999px;
+  padding: 3px 10px;
+  z-index: 2;
+}
+/* 补做选项：搁在提示行上方，点选项不触发轻触翻页 */
+.rp-backfill {
+  margin-top: 14px;
+  width: min(100%, 340px);
+  align-self: center;
 }
 .rp-dialog { position: relative; margin-top: auto; padding: 0 16px; }
 /* 回看里旁白框不拦截点击：轻触统一走「先补全打字、再翻页」 */

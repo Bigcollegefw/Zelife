@@ -33,3 +33,30 @@ export async function api(path, { method = 'GET', body } = {}) {
   if (res.status === 401) clearToken() // 会话失效：本地清 token，界面层自行决定引导
   throw new Error((data && data.error) || '出了点小问题，稍后再试')
 }
+
+/* 分享上传：FormData 大包走 XHR（fetch 拿不到上传进度）。onProgress(0-100) 可选 */
+export function apiUpload(path, formData, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', '/api' + path)
+    if (authState.token) xhr.setRequestHeader('authorization', `Bearer ${authState.token}`)
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100))
+    }
+    xhr.onload = () => {
+      let data = null
+      try {
+        data = JSON.parse(xhr.responseText)
+      } catch {
+        /* 非 JSON 按空处理 */
+      }
+      if (xhr.status >= 200 && xhr.status < 300) resolve(data)
+      else if (xhr.status === 401) {
+        clearToken()
+        reject(new Error('登录已过期，请重新登录'))
+      } else reject(new Error((data && data.error) || '出了点小问题，稍后再试'))
+    }
+    xhr.onerror = () => reject(new Error('网络不给力，稍后再试'))
+    xhr.send(formData)
+  })
+}

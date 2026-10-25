@@ -14,6 +14,7 @@ const photoSrc = computed(() => srcOf(props.scene.photo))
 const props = defineProps({
   scene: { type: Object, required: true },
   mini: { type: Boolean, default: false }, // 画布展开态的紧凑版
+  ro: { type: Boolean, default: false }, // 访客只读：一切编辑入口禁用（M2 分享）
 })
 const emit = defineEmits(['delete'])
 
@@ -244,7 +245,7 @@ async function clearEffectPhoto(idx) {
           class="ev-photo intro"
           :class="{ has: it.photo }"
           style="width: 48px; height: 64px"
-          @click="it.photo ? clearIntroPhoto(idx) : ((introIdx = idx), introPhotoEl?.click())"
+          @click="!ro && (it.photo ? clearIntroPhoto(idx) : ((introIdx = idx), introPhotoEl?.click()))"
           :title="it.photo ? '点按可移除引子背景' : '点按上传引子照片/视频'"
         >
           <img v-if="srcOf(it.photo)" :src="srcOf(it.photo)" alt="" />
@@ -256,11 +257,12 @@ async function clearEffectPhoto(idx) {
           v-autogrow
           rows="1"
           class="fi"
+          :readonly="ro"
           :placeholder="`引子 ${idx + 1}：抉择前的一段叙述（逐段轻触播放）`"
         />
-        <button class="ev-del" title="删除这段引子" @click="scene.intros.splice(idx, 1)">✕</button>
+        <button v-if="!ro" class="ev-del" title="删除这段引子" @click="scene.intros.splice(idx, 1)">✕</button>
       </div>
-      <button class="ev-addc" @click="scene.intros.push({ text: '', photo: null })">＋ 添加引子</button>
+      <button v-if="!ro" class="ev-addc" @click="scene.intros.push({ text: '', photo: null })">＋ 添加引子</button>
     </div>
 
     <div class="ev-top">
@@ -269,7 +271,7 @@ async function clearEffectPhoto(idx) {
         class="ev-photo"
         :class="[`sw-${bgKey}`, { has: scene.photo }]"
         style="width: 64px; height: 84px"
-        @click="scene.photo ? clearPhoto() : photoEl?.click()"
+        @click="!ro && (scene.photo ? clearPhoto() : photoEl?.click())"
         :title="scene.photo ? '点按可移除背景' : '点按上传照片/视频'"
       >
         <img v-if="photoSrc" :src="photoSrc" alt="" />
@@ -278,17 +280,17 @@ async function clearEffectPhoto(idx) {
       </button>
       <div class="ev-meta">
         <div class="ev-row">
-          <input :value="scene.time" type="time" class="fi time" @change="onTimeChange" />
-          <textarea v-model="scene.title" v-autogrow rows="1" class="fi grow" placeholder="标题，如 清晨 · 卧室" />
+          <input :value="scene.time" type="time" class="fi time" :readonly="ro" @change="onTimeChange" />
+          <textarea v-model="scene.title" v-autogrow rows="1" class="fi grow" :readonly="ro" placeholder="标题，如 清晨 · 卧室" />
         </div>
         <!-- 旁白占原基调下拉的位置；基调按时刻自动定。rows=1：空框只占一行，文字贴住横线 -->
-        <textarea v-model="scene.narration" v-autogrow rows="1" class="fi" placeholder="旁白：这个时刻的场景与处境" />
+        <textarea v-model="scene.narration" v-autogrow rows="1" class="fi" :readonly="ro" placeholder="旁白：这个时刻的场景与处境" />
       </div>
       <button class="ev-del" title="删除时刻" @click="emit('delete', scene)">✕</button>
     </div>
 
     <!-- 背景是视频时的选项弹出时机：立即（默认）或等视频播完（循环视频=第一遍播完） -->
-    <div v-if="isVid(scene.photo)" class="ev-crow ev-waitend">
+    <div v-if="!ro && isVid(scene.photo)" class="ev-crow ev-waitend">
       <span class="ev-delta-label">选项时机</span>
       <button type="button" class="ev-waitend-btn" :class="{ on: scene.photo.waitEnd }" @click="toggleWaitEnd">
         {{ scene.photo.waitEnd ? '视频播完再弹出' : '与旁白同时出现' }}
@@ -301,8 +303,8 @@ async function clearEffectPhoto(idx) {
     <div v-for="(c, i) in scene.choices" :key="i" class="ev-choice">
       <div class="ev-crow">
         <span class="ev-optnum" :title="`决策 ${i + 1}（与画布箭头对应）`">{{ OPT_NUMS[i] ?? i + 1 }}</span>
-        <textarea v-model="c.text" v-autogrow rows="1" class="fi grow" :placeholder="`决策 ${i + 1}`" />
-        <button v-if="scene.choices.length > 2" class="ev-del small" @click="scene.choices.splice(i, 1)">✕</button>
+        <textarea v-model="c.text" v-autogrow rows="1" class="fi grow" :readonly="ro" :placeholder="`决策 ${i + 1}`" />
+        <button v-if="!ro && scene.choices.length > 2" class="ev-del small" @click="scene.choices.splice(i, 1)">✕</button>
       </div>
       <div class="ev-crow">
         <span class="ev-delta-label">状态</span>
@@ -313,6 +315,7 @@ async function clearEffectPhoto(idx) {
           max="50"
           step="1"
           class="fi delta-input"
+          :readonly="ro"
           title="正数状态回升，负数状态下滑，可直接输入"
         />
         <span class="delta-hint" :class="c.delta > 0 ? 'good' : c.delta < 0 ? 'bad' : 'zero'">
@@ -321,30 +324,30 @@ async function clearEffectPhoto(idx) {
       </div>
       <div class="ev-crow ev-goto">
         <span class="ev-goto-label">走向</span>
-        <button type="button" class="ev-goto-btn grow" @click="gotoSheet = { choice: c }">
+        <button type="button" class="ev-goto-btn grow" :disabled="ro" @click="gotoSheet = { choice: c }">
           <span>{{ gotoLabel(c) }}</span><i>›</i>
         </button>
       </div>
-      <textarea v-model="c.feedback" v-autogrow rows="1" class="fi" placeholder="选择后的反馈旁白" />
+      <textarea v-model="c.feedback" v-autogrow rows="1" class="fi" :readonly="ro" placeholder="选择后的反馈旁白" />
       <div class="ev-crow ev-effect">
         <button
           type="button"
           class="ev-photo effect"
           :class="{ has: c.effect?.photo }"
           style="width: 40px; height: 52px"
-          @click="c.effect?.photo ? clearEffectPhoto(i) : ((effectIdx = i), effectPhotoEl?.click())"
+          @click="!ro && (c.effect?.photo ? clearEffectPhoto(i) : ((effectIdx = i), effectPhotoEl?.click()))"
           :title="c.effect?.photo ? '点按可移除效果背景' : '点按上传效果照片/视频'"
         >
           <img v-if="srcOf(c.effect?.photo)" :src="srcOf(c.effect?.photo)" alt="" />
           <span v-else class="ev-photo-add">＋效果</span>
           <i v-if="isVid(c.effect?.photo)" class="ev-vid-mark">▶</i>
         </button>
-        <textarea v-model="c.effect.text" v-autogrow rows="1" class="fi grow" placeholder="效果演出文字（选择后全屏播放，留空用反馈旁白）" />
+        <textarea v-model="c.effect.text" v-autogrow rows="1" class="fi grow" :readonly="ro" placeholder="效果演出文字（选择后全屏播放，留空用反馈旁白）" />
       </div>
     </div>
 
     <button
-      v-if="scene.choices.length < 4"
+      v-if="!ro && scene.choices.length < 4"
       class="ev-addc"
       @click="scene.choices.push({ text: '新的选项', delta: 0, feedback: '……', reflect: '', effect: { text: '', photo: null }, to: null })"
     >

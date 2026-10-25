@@ -6,7 +6,7 @@ import { nightNote } from '../night.js'
 import { letters, saveLetter, updateLetter } from '../letters.js'
 
 const router = useRouter()
-const { state, activePreset, allNodes, tier, reset } = useGame()
+const { state, activePreset, allNodes, tier, reset, startDay, guest } = useGame()
 
 const dateLabel = computed(() => {
   const d = state.date ? new Date(state.date) : new Date()
@@ -28,6 +28,7 @@ const draft = ref('')
 const taEl = ref(null)
 
 onMounted(() => {
+  if (guest.on) return // 访客：夜记只在内存里，不进本机夜记集
   // 生成即存档（同一天不覆盖已编辑的正文），展示以存档为准
   saveLetter({
     id: dateKey.value,
@@ -37,8 +38,8 @@ onMounted(() => {
     tierLabel: tier.value.label,
     state: state.gloom,
     presetName: activePreset.value?.name ?? '',
-    choices: state.log.filter((e) => !e.missed).length,
-    missed: state.log.filter((e) => e.missed).length,
+    choices: state.log.filter((e) => !e.missed || e.late).length,
+    missed: state.log.filter((e) => e.missed && !e.late).length,
   })
   const saved = letters.find((x) => x.id === dateKey.value)
   entry.value = saved ? { ...saved } : null
@@ -64,8 +65,19 @@ function saveEdit() {
   editing.value = false
 }
 
+/* 访客空间跳转 */
+function nav(path) {
+  router.push((guest.on && guest.work ? '/w/' + guest.work.code : '') + path)
+}
+
 function replay() {
   reset()
+  if (guest.on) {
+    // 访客「再体验一遍」：重开同一天，不回开场页
+    startDay()
+    nav('/stage')
+    return
+  }
   router.push('/intro')
 }
 </script>
@@ -88,11 +100,11 @@ function replay() {
       <p v-else class="letter-text serif">{{ entry?.text ?? generated }}</p>
     </section>
 
-    <p class="r-tag">夜记 · 生成后可编辑 · 已存入夜记集</p>
+    <p class="r-tag">{{ guest.on ? '夜记 · 体验版，不会保存' : '夜记 · 生成后可编辑 · 已存入夜记集' }}</p>
 
     <div class="r-actions">
-      <button class="btn ghost small" @click="router.push('/letters')">夜记集</button>
-      <template v-if="!editing">
+      <button v-if="!guest.on" class="btn ghost small" @click="router.push('/letters')">夜记集</button>
+      <template v-if="!editing && !guest.on">
         <button class="btn ghost small" @click="startEdit">编辑这封信</button>
       </template>
       <template v-else>
@@ -102,7 +114,7 @@ function replay() {
     </div>
 
     <footer v-if="!editing" class="r-foot">
-      <button class="btn ghost big" @click="router.push('/stage')">回到此刻</button>
+      <button class="btn ghost big" @click="nav('/stage')">回到此刻</button>
       <button class="btn primary big" @click="replay">再过一天</button>
     </footer>
   </div>
