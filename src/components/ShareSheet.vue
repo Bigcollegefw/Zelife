@@ -1,9 +1,10 @@
 <script setup>
 /* 分享管理弹层（Teleport 到 body）：分享当前剧本 + 管理历史分享（复制/停用/恢复/删除）。
    由 share.js 的 shareState.open 控制，挂载在 App.vue。 */
-import { onMounted, ref } from 'vue'
+import { ref, watch } from 'vue'
 import { apiUpload } from '../api.js'
 import { useGame } from '../store.js'
+import { authState, openLogin } from '../auth.js'
 import { shareState, myWorks, revokeWork, deleteWork, copyShareLink, buildWorkUpload } from '../share.js'
 import { confirmBox } from '../confirm.js'
 
@@ -37,7 +38,18 @@ async function refresh() {
   }
   loading.value = false
 }
-onMounted(refresh)
+/* 每次打开都清掉上一次的报错/提示并重新拉列表——
+   组件常驻 App.vue，onMounted 只在应用启动跑一次，状态不重置会残留旧报错 */
+watch(
+  () => shareState.open,
+  (open) => {
+    if (!open) return
+    err.value = ''
+    flash.value = ''
+    fallbackUrl.value = ''
+    refresh()
+  },
+)
 
 async function shareCurrent() {
   if (busy.value) return
@@ -121,6 +133,9 @@ function onPickFallback() {
 
         <p v-if="flash" class="ss-flash">{{ flash }}</p>
         <p v-if="err" class="ss-err">{{ err }}</p>
+        <button v-if="err && !authState.user" class="ss-share-btn" @click="openLogin()">
+          会话已失效：重新登录
+        </button>
         <div v-if="fallbackUrl" class="ss-fallback">
           <input class="ss-url" :value="fallbackUrl" readonly @focus="onPickFallback" />
           <p class="ss-sub">自动复制不可用：长按上方链接手动复制</p>
@@ -152,7 +167,7 @@ function onPickFallback() {
 <style scoped>
 .ss-mask {
   position: fixed; inset: 0; z-index: 40;
-  background: rgba(28, 24, 18, 0.35);
+  background: var(--mask);
   display: flex; align-items: flex-end; justify-content: center;
 }
 .ss-sheet {
@@ -172,7 +187,7 @@ function onPickFallback() {
 }
 .ss-share-btn {
   width: 100%; border: none; border-radius: 3px; cursor: pointer;
-  background: var(--ink); color: #FBFAF7; font: inherit; font-size: 14px;
+  background: var(--ink); color: var(--on-ink); font: inherit; font-size: 14px;
   letter-spacing: 0.1em; padding: 13px 20px;
 }
 .ss-share-btn:disabled { opacity: 0.6; }

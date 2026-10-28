@@ -2,13 +2,22 @@
 import { useRouter } from 'vue-router'
 import { useGame } from '../store.js'
 import { openDrawer } from '../drawer.js'
+import { confirmBox } from '../confirm.js'
+import ModeSwitch from '../components/ModeSwitch.vue'
 
 const router = useRouter()
-const { state, startDay } = useGame()
+const { state, presets, startDay, setActivePreset } = useGame()
 
 function begin() {
   startDay()
   router.push('/stage')
+}
+
+/* 主页选剧本：语义与抽屉/编辑器一致——中途切换＝确认后清空重开 */
+async function pickPreset(p) {
+  if (p.id === presets.activeId) return
+  if (state.started && state.log.length && !(await confirmBox('切换预设会开始新的一天，当前进度将清空。'))) return
+  setActivePreset(p.id)
 }
 </script>
 
@@ -34,6 +43,28 @@ function begin() {
           <span>每次选择都在为这一天着色。-10 到 100，坏、哀、尚可、好、爽——五档，看你把日子过成哪一档。</span>
         </li>
       </ul>
+
+      <!-- 开始区：先定剧本和模式，再按下开始 -->
+      <div class="intro-setup">
+        <div class="su-row">
+          <i class="su-label serif">剧本</i>
+          <div class="su-presets">
+            <button
+              v-for="p in presets.list"
+              :key="p.id"
+              class="su-chip"
+              :class="{ on: p.id === presets.activeId }"
+              @click="pickPreset(p)"
+            >
+              {{ p.name }}<i v-if="p.id === presets.activeId"> ✓</i>
+            </button>
+          </div>
+        </div>
+        <div class="su-row">
+          <i class="su-label serif">模式</i>
+          <ModeSwitch />
+        </div>
+      </div>
 
       <button class="btn primary big" @click="begin">
         {{ state.started ? '继续今天' : '开始今天' }}
@@ -99,6 +130,54 @@ function begin() {
   border-top: 1px solid var(--line);
 }
 .intro-list li:last-child { border-bottom: 1px solid var(--line); }
+/* 开始区：剧本 + 模式，按下开始前定清楚 */
+.intro-setup {
+  margin: 0 0 26px;
+  border-top: 1px solid var(--line);
+}
+.su-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 2px;
+  border-bottom: 1px solid var(--line);
+}
+.su-label {
+  font-style: normal;
+  font-size: 14px;
+  letter-spacing: 0.2em;
+  color: var(--ink);
+  flex: none;
+}
+.su-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  flex: 1;
+  min-width: 0;
+}
+.su-chip {
+  border: 1px solid var(--line);
+  background: var(--paper);
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 6px 14px;
+  cursor: pointer;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+}
+.su-chip.on {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--on-ink);
+}
 .intro-list i {
   font-style: normal;
   font-family: var(--serif);

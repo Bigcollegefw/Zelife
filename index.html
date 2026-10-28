@@ -5,6 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#FAF8F4" />
     <meta name="color-scheme" content="light" />
+    <!-- 首帧就用对主题（模块脚本来不及）：档位与色值同 src/theme.js -->
+    <script>
+      try {
+        var s = localStorage.getItem('galplan-theme-v1') || 'auto'
+        if (s === 'dark' || (s === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches)) {
+          document.documentElement.dataset.theme = 'dark'
+          var m = document.querySelector('meta[name=theme-color]')
+          if (m) m.content = '#201D18'
+          var c = document.querySelector('meta[name=color-scheme]')
+          if (c) c.content = 'dark'
+        }
+      } catch (e) {}
+    </script>
     <link rel="icon" href="data:," />
     <title>galplan · 把一天过成一场游戏</title>
   </head>

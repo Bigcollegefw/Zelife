@@ -27,7 +27,7 @@ const emit = defineEmits(['pick', 'close'])
 <style scoped>
 .ts-mask {
   position: fixed; inset: 0; z-index: 40;
-  background: rgba(28, 24, 18, 0.35);
+  background: var(--mask);
   display: flex; align-items: flex-end; justify-content: center;
 }
 .ts-sheet {

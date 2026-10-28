@@ -59,14 +59,14 @@ defineExpose({ skip, isTyping: () => !done.value })
 <style scoped>
 .dbox {
   position: relative;
-  background: rgba(255, 255, 255, 0.88);
+  background: var(--veil);
   -webkit-backdrop-filter: blur(14px) saturate(1.05);
   backdrop-filter: blur(14px) saturate(1.05);
-  border: 1px solid rgba(51, 48, 43, 0.12);
+  border: 1px solid var(--line);
   border-radius: 8px;
   padding: 14px 18px 16px;
   min-height: 108px;
-  box-shadow: 0 10px 30px rgba(60, 50, 30, 0.1);
+  box-shadow: 0 10px 30px var(--shadow);
   cursor: pointer;
 }
 .dbox-tag {
@@ -117,7 +117,10 @@ defineExpose({ skip, isTyping: () => !done.value })
   letter-spacing: 0.06em;
   line-height: 2.1;
   min-height: 0;
-  text-shadow: 0 1px 14px rgba(0, 0, 0, 0.4);
+  /* 紧核+柔晕双层暗影（字幕式）：白亮照片上奶油字也压得住 */
+  text-shadow:
+    0 1px 2px rgba(20, 18, 15, 0.78),
+    0 2px 14px rgba(20, 18, 15, 0.5);
 }
 .dbox.bare .dbox-caret { background: #F5F1E8; }
 </style>

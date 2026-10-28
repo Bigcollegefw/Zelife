@@ -12,11 +12,12 @@ import { openShare } from '../share.js'
 import { drawerState } from '../drawer.js'
 import { confirmBox } from '../confirm.js'
 import GloomMeter from './GloomMeter.vue'
+import ModeSwitch from './ModeSwitch.vue'
+import ThemeSwitch from './ThemeSwitch.vue'
 
 const route = useRoute()
 const router = useRouter()
-const { state, presets, frontier, finished, tier, guest, startDay, setMode, reset, setActivePreset, exitGuest } =
-  useGame()
+const { state, presets, frontier, tier, guest, startDay, setActivePreset, exitGuest } = useGame()
 const { authState } = useAuth()
 
 function close() {
@@ -70,32 +71,6 @@ function beginDay() {
   router.push({ path: base + '/stage', query: { b: Date.now().toString(36) } })
 }
 
-/** 演示⇄真实：两种模式的时间推进规则不同，中途切换一律重开今天（用户拍板）。
-    还没开始今天时随便切，无进度可丢、不打断。 */
-async function pickMode(mode) {
-  if (state.mode === mode) return
-  if (!state.started) {
-    setMode(mode)
-    return
-  }
-  const body =
-    mode === 'real'
-      ? '会重新开始今天：已经过点的时刻将顺流而去，从当前时刻继续。当前进度清空。'
-      : '会从头开始今天，逐个时刻重演。当前进度清空。'
-  if (!(await confirmBox(mode === 'real' ? '切换到真实模式？' : '切换到演示模式？', { body }))) return
-  reset()
-  setMode(mode)
-  beginDay()
-}
-
-/** 回到舞台：本人回 /stage；访客回沙箱里的舞台。已在舞台时什么都不动 */
-function backToStage() {
-  close()
-  const target = (guest.on && guest.work ? `/w/${guest.work.code}` : '') + '/stage'
-  if (route.path === target) return
-  router.push(target)
-}
-
 /* 分享此剧本：登录是唯一前置（同原汇总页）。先收抽屉——分享层与抽屉同层，不收会被盖住 */
 function onShare() {
   close()
@@ -103,7 +78,7 @@ function onShare() {
   else openLogin()
 }
 
-/* ---------- 导航项 ---------- */
+/* ---------- 导航项：随所在页变化——主页给「回到此刻」，别处给「回到主页」（用户拍板） ---------- */
 const navItems = computed(() => {
   if (guest.on) {
     const base = '/w/' + guest.work?.code
@@ -112,10 +87,13 @@ const navItems = computed(() => {
       { key: 'editor', label: '剧本画布', to: base + '/editor' },
     ]
   }
-  return [
-    { key: 'letters', label: '夜记集', to: '/letters' },
-    { key: 'editor', label: '剧本画布', to: '/editor' },
-  ]
+  const items = []
+  if (state.started) {
+    if (route.path === '/intro') items.push({ key: 'stage', label: '回到此刻', to: '/stage' })
+    else items.push({ key: 'home', label: '回到主页', to: '/intro' })
+  }
+  items.push({ key: 'letters', label: '夜记集', to: '/letters' }, { key: 'editor', label: '剧本画布', to: '/editor' })
+  return items
 })
 
 function go(item) {
@@ -166,10 +144,7 @@ function leaveGuest() {
             <section class="sd-today">
               <div class="sd-today-head">
                 <div class="sd-date serif">{{ dateLabel }}</div>
-                <div v-if="!guest.on" class="mode-switch" role="radiogroup" aria-label="时间模式">
-                  <button :class="{ on: state.mode === 'manual' }" @click="pickMode('manual')">演示</button>
-                  <button :class="{ on: state.mode === 'real' }" @click="pickMode('real')">真实</button>
-                </div>
+                <ModeSwitch v-if="!guest.on" @restarted="beginDay" />
               </div>
 
               <div class="sd-hero">
@@ -210,8 +185,6 @@ function leaveGuest() {
               </p>
 
               <div v-if="!guest.on" class="sd-actions">
-                <button v-if="!state.started" class="btn primary big" @click="beginDay">开始今天</button>
-                <button v-else-if="!finished" class="btn primary big" @click="backToStage">回到此刻</button>
                 <button class="btn ghost big" @click="onShare">分享此剧本</button>
               </div>
             </section>
@@ -238,6 +211,12 @@ function leaveGuest() {
               </button>
             </template>
 
+            <!-- 外观：显示偏好只存本机，与进度/账号无关，访客也能换 -->
+            <div class="sd-theme">
+              <i class="sd-theme-label serif">外观</i>
+              <ThemeSwitch />
+            </div>
+
             <button v-if="guest.on" class="sd-leave" @click="leaveGuest">退出分享</button>
           </aside>
         </div>
@@ -251,7 +230,7 @@ function leaveGuest() {
   position: fixed;
   inset: 0;
   z-index: 40;
-  background: rgba(28, 24, 18, 0.35);
+  background: var(--mask);
   display: flex;
   justify-content: center;
 }
@@ -270,7 +249,7 @@ function leaveGuest() {
   width: min(84%, 340px);
   background: var(--paper);
   border-right: 1px solid var(--line);
-  box-shadow: 8px 0 30px rgba(60, 50, 30, 0.1);
+  box-shadow: 8px 0 30px var(--shadow);
   padding: calc(14px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));
   overflow-y: auto;
   display: flex;
@@ -368,27 +347,6 @@ function leaveGuest() {
   font-weight: 600;
   letter-spacing: 0.05em;
 }
-.mode-switch {
-  display: inline-flex;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 3px;
-  background: var(--paper);
-  flex: none;
-}
-.mode-switch button {
-  border: none;
-  background: transparent;
-  font: inherit;
-  font-size: 11px;
-  letter-spacing: 0.1em;
-  padding: 4px 12px;
-  border-radius: 999px;
-  color: var(--ink-2);
-  cursor: pointer;
-  transition: background 0.18s ease, color 0.18s ease;
-}
-.mode-switch button.on { background: var(--ink); color: #fbfaf7; }
 
 .sd-hero {
   background: var(--bg);
@@ -463,9 +421,9 @@ function leaveGuest() {
   animation: sd-tl-pulse 2.4s ease infinite;
 }
 @keyframes sd-tl-pulse {
-  0% { box-shadow: 0 0 0 0 rgba(51, 48, 43, 0.18); }
-  70% { box-shadow: 0 0 0 7px rgba(51, 48, 43, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(51, 48, 43, 0); }
+  0% { box-shadow: 0 0 0 0 var(--pulse); }
+  70% { box-shadow: 0 0 0 7px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
 }
 .tl-title { font-size: 14px; letter-spacing: 0.04em; }
 .tl-status { font-size: 11px; color: var(--ink-2); margin-top: 3px; letter-spacing: 0.02em; }
@@ -552,6 +510,23 @@ function leaveGuest() {
   font-style: normal;
   color: var(--ink-3);
   font-size: 16px;
+}
+
+/* ---- 外观（显示偏好） ---- */
+.sd-theme {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.sd-theme-label {
+  font-style: normal;
+  font-size: 14px;
+  letter-spacing: 0.2em;
+  color: var(--ink);
 }
 
 /* ---- 访客退出 ---- */

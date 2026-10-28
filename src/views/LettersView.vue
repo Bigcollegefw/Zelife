@@ -138,10 +138,11 @@ async function del() {
 }
 .l-item:active { background: var(--mist); }
 .l-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--ink-3); }
-.l-dot.great, .l-dot.good { background: #4F7D78; }
-.l-dot.ok { background: #7E8F7C; }
-.l-dot.sad { background: #8A7454; }
-.l-dot.bad { background: #8C5A50; }
+.l-dot.great { background: var(--tier-great); }
+.l-dot.good { background: var(--tier-good); }
+.l-dot.ok { background: var(--tier-ok); }
+.l-dot.sad { background: var(--tier-sad); }
+.l-dot.bad { background: var(--tier-bad); }
 .l-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .l-date { font-size: 15px; letter-spacing: 0.04em; }
 .l-excerpt {

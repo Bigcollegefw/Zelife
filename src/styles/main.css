@@ -1,6 +1,6 @@
-/* ============ 设计基准：浅色 · 日系简约 ============ */
+/* ============ 设计基准：浅色 · 日系简约；暖夜主题见下方 [data-theme='dark'] ============ */
 :root {
-  color-scheme: light; /* 锁定浅色，防止浏览器强制暗色 */
+  color-scheme: light; /* 跟随 data-theme 切换，防浏览器强制暗色 */
   --bg: #FAF8F4;
   --paper: #FFFFFF;
   --ink: #33302B;
@@ -10,8 +10,52 @@
   --mist: #F1EEE7;
   --good: #4F7D78;
   --bad: #AE6E62;
+  /* 五档状态色（GloomMeter 取色）：深浅各一套，JS 里 stateTier 的 color 仅作参考 */
+  --tier-bad: #8C5A50;
+  --tier-sad: #8A7454;
+  --tier-ok: #7E8F7C;
+  --tier-good: #4F7D78;
+  --tier-great: #3E6B66;
+  /* 玻璃面 / 反白字 / 投影：深浅两套，散落各处的硬编码玻璃色统一走这里 */
+  --veil: rgba(255, 255, 255, 0.82); /* 毛玻璃面（chip / 对话框 / 选项底） */
+  --veil-soft: rgba(255, 255, 255, 0.55); /* 弱玻璃（ghost chip / 页签底） */
+  --on-ink: #FBFAF7; /* 深底反白字（primary 按钮、选中态） */
+  --ink-strong: #211E1A; /* primary 悬停加深一档 */
+  --outside: #ECEAE4; /* 桌面端 shell 外的信纸边 */
+  --shadow: rgba(60, 50, 30, 0.1);
+  --pulse: rgba(51, 48, 43, 0.18); /* 「现在」点标的脉冲起点 */
+  --mask: rgba(28, 24, 18, 0.35); /* 弹层/抽屉外的压暗遮罩 */
+  --edge: #A38D6A; /* 画布连线与箭头 */
   --serif: 'Songti SC', 'STSong', 'SimSun', 'Noto Serif SC', 'Source Han Serif SC', serif;
   --sans: 'YouYuan', '幼圆', 'Hiragino Sans GB', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+}
+
+/* ============ 暖夜：夜里暖灯下的旧纸，延续过场 #2B2823 的色温（不是科技冷灰） ============ */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #201D18;
+  --paper: #2A251F;
+  --ink: #E9E1D3;
+  --ink-2: #A69C8B;
+  --ink-3: #6E665A;
+  --line: #3C362D;
+  --mist: #332E26;
+  --good: #82ABA2; /* 深底上提亮一档才够看 */
+  --bad: #CB9083;
+  --tier-bad: #C58B7D;
+  --tier-sad: #BCA071;
+  --tier-ok: #94A991;
+  --tier-good: #7FA8A0;
+  --tier-great: #6FA39B;
+  --veil: rgba(38, 33, 27, 0.86);
+  --veil-soft: rgba(38, 33, 27, 0.6);
+  --on-ink: #201D18; /* primary 变奶油底深字 */
+  --ink-strong: #F4EDDF;
+  --outside: #141210;
+  --shadow: rgba(0, 0, 0, 0.4);
+  --pulse: rgba(233, 225, 211, 0.22);
+  --mask: rgba(0, 0, 0, 0.52);
+  --edge: #C0A470;
 }
 
 * { box-sizing: border-box; }
@@ -21,7 +65,7 @@ body {
   font-family: var(--sans);
   font-size: 15px;
   color: var(--ink);
-  background: #ECEAE4;
+  background: var(--outside);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
 }
@@ -34,7 +78,7 @@ body {
   min-height: 100dvh;
   background: var(--bg);
   position: relative;
-  box-shadow: 0 0 60px rgba(60, 50, 30, 0.08);
+  box-shadow: 0 0 60px var(--shadow);
 }
 
 /* ---- 通用元件 ---- */
@@ -49,8 +93,8 @@ body {
   transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease, transform 0.1s ease;
 }
 .btn:active { transform: scale(0.985); }
-.btn.primary { background: var(--ink); color: #FBFAF7; }
-.btn.primary:hover { background: #211E1A; }
+.btn.primary { background: var(--ink); color: var(--on-ink); }
+.btn.primary:hover { background: var(--ink-strong); }
 .btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
 .btn.ghost:hover { border-color: var(--ink-2); }
 .btn.big { width: 100%; padding: 15px 24px; font-size: 15px; }

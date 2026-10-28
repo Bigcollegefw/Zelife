@@ -459,7 +459,7 @@ function drawEdge(fromId, toId, nums) {
   const path = document.createElementNS(SVG_NS, 'path')
   path.setAttribute('d', d)
   path.setAttribute('fill', 'none')
-  path.setAttribute('stroke', '#A38D6A')
+  path.setAttribute('class', 'edge-line')
   path.setAttribute('stroke-width', '1.3')
   path.setAttribute('stroke-dasharray', '4 4')
   svg.appendChild(path)
@@ -467,7 +467,7 @@ function drawEdge(fromId, toId, nums) {
   const arr = document.createElementNS(SVG_NS, 'path')
   arr.setAttribute('d', `M${x2},${y2} m-3.5,-5 l7,0 l-3.5,7 z`)
   arr.setAttribute('transform', `rotate(${dir}, ${x2}, ${y2})`)
-  arr.setAttribute('fill', '#A38D6A')
+  arr.setAttribute('class', 'edge-arrow')
   svg.appendChild(arr)
 
   // 箭头上的决策序号：标出前一节点的第几个决策通向这条线；点击可断开
@@ -1111,7 +1111,7 @@ function isTerminal(n) {
   transition: all 0.16s ease;
 }
 .p-chip i { font-style: normal; font-size: 11px; opacity: 0.7; }
-.p-chip.on { background: var(--ink); border-color: var(--ink); color: #FBFAF7; }
+.p-chip.on { background: var(--ink); border-color: var(--ink); color: var(--on-ink); }
 .e-newp {
   display: flex; gap: 10px; margin: 12px 18px 0; padding: 12px 14px;
   background: var(--paper); border: 1px solid var(--line); border-radius: 6px;
@@ -1142,9 +1142,12 @@ function isTerminal(n) {
 .zoomer.focusing .cnode:not(.focus) { opacity: 0.1; filter: blur(3px); }
 .zoomer.focusing .edges { opacity: 0.05; }
 :deep(.edge-num) {
-  font-size: 11px; fill: #8A7454; paint-order: stroke; stroke: var(--bg);
+  font-size: 11px; fill: var(--tier-sad); paint-order: stroke; stroke: var(--bg);
   stroke-width: 3.5px; letter-spacing: 0.02em;
 }
+/* 连线与箭头走主题 token（深色底上提亮一档），类名由 drawEdge 打上 */
+:deep(.edge-line) { stroke: var(--edge); }
+:deep(.edge-arrow) { fill: var(--edge); }
 :deep(.edge-hit) { cursor: pointer; }
 
 .cnode {
@@ -1159,7 +1162,7 @@ function isTerminal(n) {
     opacity 0.35s ease, filter 0.35s ease, box-shadow 0.2s ease,
     transform 0.3s cubic-bezier(0.22, 0.61, 0.36, 1);
 }
-.cnode:hover { box-shadow: 0 8px 24px rgba(60, 50, 30, 0.13); }
+.cnode:hover { box-shadow: 0 8px 24px var(--shadow); }
 .cnode.focus { box-shadow: 0 0 0 2px var(--ink-2); }
 .cnode.wide { background: transparent; border: none; cursor: default; }
 .cnode.terminal.small { border-style: dashed; }
@@ -1217,7 +1220,7 @@ function isTerminal(n) {
 /* 拖动落点提示（蒙版上的文字） */
 .drag-tip {
   position: fixed; top: calc(16px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
-  background: var(--ink); color: #FBFAF7; font-size: 12px; letter-spacing: 0.12em;
+  background: var(--ink); color: var(--on-ink); font-size: 12px; letter-spacing: 0.12em;
   padding: 8px 18px; border-radius: 999px; z-index: 45; pointer-events: none;
   box-shadow: 0 10px 26px rgba(60, 50, 30, 0.25);
 }
@@ -1236,7 +1239,7 @@ function isTerminal(n) {
 /* 底部面板（落点 / 断开连线），与 EventCard 走向弹层同款 */
 .sheet-mask {
   position: fixed; inset: 0; z-index: 40;
-  background: rgba(28, 24, 18, 0.35);
+  background: var(--mask);
   display: flex; align-items: flex-end; justify-content: center;
 }
 .sheet {
@@ -1266,10 +1269,10 @@ function isTerminal(n) {
 .sheet-i.danger { color: var(--bad); }
 .sheet-i.danger i { color: var(--bad); opacity: 0.75; }
 .sheet-i.primary {
-  background: var(--ink); color: #FBFAF7; justify-content: center;
+  background: var(--ink); color: var(--on-ink); justify-content: center;
   margin-bottom: 4px; padding: 12px 10px;
 }
-.sheet-i.primary:active { background: #211E1A; }
+.sheet-i.primary:active { background: var(--ink-strong); }
 .sheet-cancel {
   border: none; background: none; font: inherit; font-size: 13px; color: var(--ink-3);
   padding: 10px; cursor: pointer; letter-spacing: 0.1em;
@@ -1287,20 +1290,20 @@ function isTerminal(n) {
 }
 .n-badge {
   position: absolute; top: -9px; left: 10px; font-size: 9px; letter-spacing: 0.12em;
-  background: var(--ink); color: #FBFAF7; padding: 2px 8px; border-radius: 999px;
+  background: var(--ink); color: var(--on-ink); padding: 2px 8px; border-radius: 999px;
 }
 .n-badge.merge { background: var(--good); }
 
 .n-toggle {
   position: absolute; top: -10px; right: -10px; width: 24px; height: 24px; border-radius: 50%;
-  background: var(--ink); color: #FBFAF7; border: none; font-size: 11px; cursor: pointer;
+  background: var(--ink); color: var(--on-ink); border: none; font-size: 11px; cursor: pointer;
   display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
   z-index: 2;
 }
-.n-toggle:hover { background: #211E1A; }
+.n-toggle:hover { background: var(--ink-strong); }
 .n-zoom {
   position: absolute; top: -10px; left: -10px; width: 24px; height: 24px; border-radius: 50%;
-  background: var(--good); color: #FBFAF7; border: none; font-size: 11px; cursor: pointer;
+  background: var(--good); color: var(--on-ink); border: none; font-size: 11px; cursor: pointer;
   display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
   z-index: 2;
 }
@@ -1337,7 +1340,7 @@ function isTerminal(n) {
 }
 .e-save {
   position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(8px);
-  background: var(--ink); color: #FBFAF7; font-size: 12px; letter-spacing: 0.15em;
+  background: var(--ink); color: var(--on-ink); font-size: 12px; letter-spacing: 0.15em;
   padding: 8px 18px; border-radius: 999px; opacity: 0; pointer-events: none;
   transition: opacity 0.25s ease, transform 0.25s ease; z-index: 30;
 }

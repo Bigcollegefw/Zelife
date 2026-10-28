@@ -914,8 +914,8 @@ const deltaClass = computed(() =>
   font-size: 12px;
   letter-spacing: 0.08em;
   color: var(--ink);
-  background: rgba(255, 255, 255, 0.82);
-  border: 1px solid rgba(51, 48, 43, 0.12);
+  background: var(--veil);
+  border: 1px solid var(--line);
   border-radius: 999px;
   padding: 5px 12px;
   -webkit-backdrop-filter: blur(8px);
@@ -923,10 +923,11 @@ const deltaClass = computed(() =>
   cursor: pointer;
   white-space: nowrap;
 }
-.chip.ghost { background: rgba(255, 255, 255, 0.55); }
+.chip.ghost { background: var(--veil-soft); }
 .chip.small { font-size: 11px; padding: 4px 10px; color: var(--ink-2); }
 .chip.dark {
-  background: rgba(255, 255, 255, 0.14);
+  /* 深色实底毛玻璃（blur 继承自 .chip）：白亮照片上奶油字也有底，同回看坞 10-24 拍板 */
+  background: rgba(34, 31, 26, 0.62);
   border-color: rgba(245, 241, 232, 0.3);
   color: #F5F1E8;
 }
@@ -958,7 +959,7 @@ const deltaClass = computed(() =>
   z-index: 7;
   padding: 7px 16px;
   border-radius: 999px;
-  color: #FBFAF7;
+  color: var(--on-ink);
   font-size: 13px;
   letter-spacing: 0.12em;
   box-shadow: 0 8px 22px rgba(60, 50, 30, 0.18);
@@ -1000,13 +1001,24 @@ const deltaClass = computed(() =>
   background: rgba(30, 27, 23, 0.42);
 }
 .interlude > *:not(.in-bg):not(.in-tools):not(.in-hint) { position: relative; }
+/* 过场文字统一字幕式暗晕（紧核+柔晕两层）：照片再白再亮，奶油字也压得住，不必再压暗照片 */
+.in-time,
+.in-title,
+.in-count,
+.in-hint,
+.rp-delta,
+.rp-reflect {
+  text-shadow:
+    0 1px 2px rgba(20, 18, 15, 0.78),
+    0 2px 14px rgba(20, 18, 15, 0.5);
+}
 .in-time { font-size: 40px; letter-spacing: 0.2em; text-indent: 0.2em; }
 .in-time.small { font-size: 15px; letter-spacing: 0.24em; opacity: 0.85; }
-.in-line { width: 34px; height: 1px; background: rgba(245, 241, 232, 0.35); }
-.in-title { font-size: 14px; letter-spacing: 0.4em; text-indent: 0.4em; color: rgba(245, 241, 232, 0.72); }
+.in-line { width: 34px; height: 1px; background: rgba(245, 241, 232, 0.35); box-shadow: 0 1px 3px rgba(20, 18, 15, 0.55); }
+.in-title { font-size: 14px; letter-spacing: 0.4em; text-indent: 0.4em; color: rgba(245, 241, 232, 0.85); }
 .in-title.small { font-size: 12px; }
 .in-head { display: flex; flex-direction: column; gap: 8px; align-items: center; margin-bottom: 26px; }
-.in-count { font-size: 10px; letter-spacing: 0.2em; color: rgba(245, 241, 232, 0.45); }
+.in-count { font-size: 10px; letter-spacing: 0.2em; color: rgba(245, 241, 232, 0.62); }
 .in-tools {
   position: absolute;
   bottom: calc(62px + env(safe-area-inset-bottom));
@@ -1021,7 +1033,7 @@ const deltaClass = computed(() =>
   bottom: calc(30px + env(safe-area-inset-bottom));
   font-size: 11px;
   letter-spacing: 0.3em;
-  color: rgba(245, 241, 232, 0.38);
+  color: rgba(245, 241, 232, 0.55);
   animation: in-hint 2s ease infinite;
 }
 @keyframes in-hint { 50% { opacity: 0.4; } }
@@ -1053,7 +1065,7 @@ const deltaClass = computed(() =>
   flex-direction: column;
   padding-bottom: calc(152px + env(safe-area-inset-bottom));
 }
-/* 补做徽标 */
+/* 补做徽标：深色实底，白亮照片上也看得清 */
 .rp-late {
   position: absolute;
   top: 14px;
@@ -1062,6 +1074,9 @@ const deltaClass = computed(() =>
   letter-spacing: 0.2em;
   color: rgba(245, 241, 232, 0.85);
   border: 1px solid rgba(245, 241, 232, 0.4);
+  background: rgba(34, 31, 26, 0.55);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
   border-radius: 999px;
   padding: 3px 10px;
   z-index: 2;
@@ -1091,7 +1106,7 @@ const deltaClass = computed(() =>
   font-size: 11px;
   letter-spacing: 0.14em;
   color: var(--ink-2);
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--veil-soft);
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
   border-radius: 999px;
@@ -1103,13 +1118,13 @@ const deltaClass = computed(() =>
   padding: 9px 16px;
   font-size: 13px;
   color: var(--ink);
-  background: rgba(252, 250, 246, 0.88);
-  border: 1px solid rgba(51, 48, 43, 0.14);
+  background: var(--veil);
+  border: 1px solid var(--line);
   border-radius: 999px;
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
 }
-.rp-nav .btn.ghost:hover { border-color: var(--ink-2); background: rgba(255, 255, 255, 0.95); }
+.rp-nav .btn.ghost:hover { border-color: var(--ink-2); background: var(--paper); }
 .rp-nav .btn:disabled { opacity: 0.35; cursor: default; }
 /* 页签：一颗＝一个决定，可点跳转；末尾一颗＝此刻 */
 .rp-dots {
@@ -1120,7 +1135,7 @@ const deltaClass = computed(() =>
   overflow: hidden;
   padding: 4px 10px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.55);
+  background: var(--veil-soft);
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
 }

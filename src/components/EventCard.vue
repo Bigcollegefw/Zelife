@@ -499,14 +499,14 @@ textarea.fi {
 }
 .ev-waitend-btn.on {
   color: var(--ink);
-  background: #F0E9D8;
+  background: var(--paper);
   border-color: var(--line);
 }
 
 /* 走向底部弹层 */
 .ev-sheet-mask {
   position: fixed; inset: 0; z-index: 40;
-  background: rgba(28, 24, 18, 0.35);
+  background: var(--mask);
   display: flex; align-items: flex-end; justify-content: center;
 }
 .ev-sheet {
@@ -529,10 +529,10 @@ textarea.fi {
 .ev-sheet-i:active { background: var(--mist); }
 .ev-sheet-i.cur { font-weight: 600; }
 .ev-sheet-i.primary {
-  background: var(--ink); color: #FBFAF7; justify-content: center;
+  background: var(--ink); color: var(--on-ink); justify-content: center;
   margin-bottom: 4px; padding: 12px 10px;
 }
-.ev-sheet-i.primary:active { background: #211E1A; }
+.ev-sheet-i.primary:active { background: var(--ink-strong); }
 .ev-sheet-i i { font-style: normal; color: var(--good); font-size: 13px; flex: none; }
 .ev-sheet-cancel {
   border: none; background: none; font: inherit; font-size: 13px; color: var(--ink-3);
@@ -551,7 +551,7 @@ textarea.fi {
 .delta.zero { color: var(--ink-2); }
 
 /* 画布展开态的紧凑版 */
-.ev.mini { padding: 12px; gap: 9px; box-shadow: 0 10px 30px rgba(60, 50, 30, 0.12); }
+.ev.mini { padding: 12px; gap: 9px; box-shadow: 0 10px 30px var(--shadow); }
 .ev.mini .fi { font-size: 12.5px; padding: 5px 2px 1px; }
 .ev.mini textarea.fi { font-size: 12.5px; }
 .ev.mini .ev-choice { padding: 8px; gap: 6px; }

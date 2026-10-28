@@ -23,8 +23,11 @@ function persist() {
   }
 }
 
+/* 会话失效（api 收到 401）时调用：token 与用户一并清——
+   界面必须回到诚实的未登录态，否则会「看着像登录了」却发不出任何凭证 */
 export function clearToken() {
   authState.token = null
+  authState.user = null
   persist()
 }
 
@@ -88,7 +91,7 @@ export async function uploadAvatar(blob) {
 }
 
 /* App.vue onMounted 调用：乐观恢复登录态 + 后台校验。
-   401 时 api() 已清 token（user 留作展示）；网络失败则全保留，离线容忍、静默。 */
+   401 时 api() 已清登录态（回到诚实未登录）；网络失败则全保留，离线容忍、静默。 */
 export async function initAuth() {
   let saved = null
   try {

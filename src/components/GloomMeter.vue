@@ -1,5 +1,7 @@
 <script setup>
-defineProps({
+import { computed } from 'vue'
+
+const props = defineProps({
   value: { type: Number, required: true },
   tier: { type: Object, required: true }, // stateTier() 的返回值
   compact: { type: Boolean, default: false },
@@ -8,20 +10,22 @@ defineProps({
 
 // 五档刻度：坏(-10~0) / 哀(0~25) / 尚可(25~50) / 好(50~75) / 爽(75~100)
 const pct = (v) => ((v + 10) / 110) * 100
+// 档位色走 CSS 变量（--tier-* 深浅两套在 main.css）：深色底上要提亮一档才不发闷
+const tc = computed(() => `var(--tier-${props.tier.key})`)
 </script>
 
 <template>
-  <span v-if="compact" class="gm-pill" :style="{ '--tc': tier.color }">
+  <span v-if="compact" class="gm-pill" :style="{ '--tc': tc }">
     <i class="gm-dot" />{{ tier.label }} <b class="serif">{{ value }}</b>
   </span>
 
   <div v-else class="gm">
     <div class="gm-row">
       <span class="gm-label">状态值</span>
-      <b class="gm-num serif" :style="{ color: tier.color }">{{ value }}</b>
+      <b class="gm-num serif" :style="{ color: tc }">{{ value }}</b>
     </div>
     <div class="gm-bar">
-      <div class="gm-fill" :style="{ width: pct(value) + '%', background: tier.color }" />
+      <div class="gm-fill" :style="{ width: pct(value) + '%', background: tc }" />
       <i v-for="b in [0, 25, 50, 75]" :key="b" class="gm-mark" :style="{ left: pct(b) + '%' }" />
     </div>
     <div class="gm-scale">
@@ -40,8 +44,8 @@ const pct = (v) => ((v + 10) / 110) * 100
   gap: 6px;
   padding: 5px 12px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.82);
-  border: 1px solid rgba(51, 48, 43, 0.12);
+  background: var(--veil);
+  border: 1px solid var(--line);
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
   font-size: 12px;
@@ -67,7 +71,7 @@ const pct = (v) => ((v + 10) / 110) * 100
   border-radius: 2px;
   transition: width 0.7s cubic-bezier(0.22, 0.61, 0.36, 1), background 0.6s ease;
 }
-.gm-mark { position: absolute; top: -3px; width: 1px; height: 10px; background: rgba(51, 48, 43, 0.22); }
+.gm-mark { position: absolute; top: -3px; width: 1px; height: 10px; background: var(--ink-3); }
 .gm-scale {
   position: relative;
   height: 14px;

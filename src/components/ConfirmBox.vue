@@ -20,7 +20,7 @@ import { confirmState, closeConfirm } from '../confirm.js'
 <style scoped>
 .cb-mask {
   position: fixed; inset: 0; z-index: 60;
-  background: rgba(28, 24, 18, 0.35);
+  background: var(--mask);
   display: flex; align-items: flex-end; justify-content: center;
 }
 .cb {
@@ -44,7 +44,7 @@ import { confirmState, closeConfirm } from '../confirm.js'
   background: var(--mist); color: var(--ink-2);
 }
 .cb-btn:active { filter: brightness(0.96); }
-.cb-btn.go { background: var(--ink); color: #FBFAF7; }
-.cb-btn.go:active { background: #211E1A; }
+.cb-btn.go { background: var(--ink); color: var(--on-ink); }
+.cb-btn.go:active { background: var(--ink-strong); }
 .cb-btn.go.danger { background: var(--bad); }
 </style>
