@@ -775,6 +775,7 @@ function focusNode(n) {
       requestAnimationFrame(() =>
         requestAnimationFrame(() => {
           if (focusBodyEl.value) focusBodyEl.value.scrollTop = 0 // 新挂载的容器本来就在顶，这里兜底
+          window.scrollTo(0, 0) // 页面级滚动（键盘弹起等）也归零，聚焦层永远从视口顶部开始
           focusVis.value = true
           zoominStart.value = false
         }),
@@ -1084,8 +1085,11 @@ function isTerminal(n) {
 <style scoped>
 .editor {
   position: relative;
-  min-height: 100vh; /* 兜底：不支持 dvh 的旧内核 */
-  min-height: 100dvh;
+  height: 100vh; /* 兜底：不支持 dvh 的旧内核 */
+  height: 100dvh;
+  /* 锁死为视口高（不能 min-height）：min-height 会被内容撑高，滚动落到 document 上，
+     聚焦层 absolute inset:0 盖的是整高容器，页面又停在底部 → 进入聚焦直接显示在下半部分 */
+  overflow: hidden;
   display: flex;
   flex-direction: column;
 }

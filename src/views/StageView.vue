@@ -14,6 +14,8 @@ import { confirmBox } from '../confirm.js'
 import GloomMeter from '../components/GloomMeter.vue'
 import DialogueBox from '../components/DialogueBox.vue'
 import ChoiceList from '../components/ChoiceList.vue'
+import SystemPanel from '../components/SystemPanel.vue'
+import SysSprite from '../components/SysSprite.vue'
 import SceneBackground from '../components/SceneBackground.vue'
 import TimingSheet from '../components/TimingSheet.vue'
 import { openDrawer } from '../drawer.js'
@@ -152,8 +154,12 @@ function onStageTap() {
     immersive.value = true // 双击空白＝沉浸（适用于过场/效果等轻触会推进的阶段）
     return
   }
+  if (phase.value === 'choose' && !sysOn.value) {
+    sysOn.value = true // 先让玩家看画面；点一下才召唤系统（图片背景的门控）
+    return
+  }
   if (phase.value === 'choose' && dbRef.value?.isTyping?.()) {
-    advance() // 旁白还在打字：先补全
+    advance() // 系统还在打字：先补全
     return
   }
   if (['choose', 'waiting', 'finale'].includes(phase.value)) {
@@ -257,6 +263,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   clearInterval(ticker)
+  clearTimeout(sysTimer)
 })
 
 // 持续记录舞台位置，供返回时续播
@@ -345,6 +352,27 @@ function applyWaitEnd(v) {
 /* ---------- 选项等视频播完（galgame 式）：进选择页视频从头播，播完才弹选项；
    循环视频由 SceneBackground 手动续播，第一遍播完同样 emit ended ---------- */
 const bgVideoEnded = ref(false)
+
+/* ---------- 系统面板出场门控（避免遮挡画面） ----------
+   图片背景：先让玩家看图，点一下屏幕才召唤系统
+   视频背景：播完自动飞入（循环视频＝第一次循环完，SceneBackground 已统一发 ended）
+   无背景：直接飞入 */
+const sysOn = ref(false)
+let sysTimer = null
+const sysAuto = computed(() => {
+  if (phase.value !== 'choose') return false
+  if (!bgMedia.value) return true // 没有背景图/视频，无需让位
+  if (bgIsVideo.value) return bgVideoEnded.value
+  return false // 图片背景：等玩家点一下
+})
+watch(sysAuto, (v) => {
+  clearTimeout(sysTimer)
+  if (v) sysTimer = setTimeout(() => (sysOn.value = true), 600) // 到位后稍候半拍再飞入
+})
+watch(phase, (p) => {
+  clearTimeout(sysTimer)
+  sysOn.value = false // 每个新时刻都重新走一遍「先看画面 → 再召唤」
+})
 // 换节点 / 重进选择页 / 换了视频 → 重新等；切循环⇄定格（id 不变）不打断
 watch(
   () => [activeId.value, phase.value, isMedia(bgMedia.value) ? bgMedia.value.id : ''],
@@ -352,9 +380,7 @@ watch(
     bgVideoEnded.value = false
   },
 )
-const choicesWaitVideo = computed(
-  () => phase.value === 'choose' && bgIsVideo.value && !!activeScene.value?.photo?.waitEnd && !bgVideoEnded.value,
-)
+/* 旧 choicesWaitVideo 已被 sysOn 门控取代：视频（含循环首次播完）结束后系统才飞入 */
 
 /* ---------- 结算背景：与其他背景同款交互（文案随内容变 / 移除确认 / 视频循环切换） ---------- */
 const finaleMedia = computed(() => activePreset.value?.finale?.photo ?? null)
@@ -600,6 +626,13 @@ const rpWhere = computed(() => {
 const showDeltaFloat = computed(() =>
   deltaKey.value > 0 && ['effect', 'missed'].includes(phase.value),
 )
+/** 效果页系统小人播报词：记录选择 + 状态变化（正值＝变好） */
+const sysEffectText = computed(() => {
+  if (!effectChoice.value) return ''
+  const d = lastDelta.value
+  const dLine = d === 0 ? '状态持平' : `状态 ${fmtDelta(d)}`
+  return `已记录宿主的选择「${effectChoice.value.text}」\n${dLine}`
+})
 const deltaClass = computed(() =>
   lastDelta.value > 0 ? 'good' : lastDelta.value < 0 ? 'bad' : 'zero',
 )
@@ -727,22 +760,39 @@ const deltaClass = computed(() =>
           >继续 ▸</button>
         </div>
         <div v-if="!effectDone && effectText" class="in-hint">轻触继续</div>
+        <!-- 系统小人：飞到屏幕中上方播报本次结算（Teleport 到 body，避免被效果页转场 transform 劫持定位） -->
+        <Teleport to="body">
+          <SysSprite v-if="effectChoice" mode="announce" :text="sysEffectText" />
+        </Teleport>
       </div>
     </transition>
 
-    <!-- 选项：屏幕正中，与旁白同时出现 -->
+    <!-- 系统面板：决策时刻整体系统化（小人播报 + 系统选项），顶替原「底部旁白 + 中间选项」 -->
     <div class="stage-choices">
       <transition name="rise">
-        <ChoiceList
-          v-if="phase === 'choose' && activeScene && !choicesWaitVideo"
+        <SystemPanel
+          v-if="phase === 'choose' && activeScene && sysOn"
+          ref="dbRef"
+          :tag="dialogueTag"
+          :text="dialogue"
           :choices="activeScene.choices"
           @choose="pick"
         />
       </transition>
+      <!-- 系统小人：独立飞行，绕屏一圈后落进面板头部。
+           Teleport 到 body：小人 position:fixed，若留在带 transform 的容器里会被当作包含块 → 位置飘移 -->
+      <Teleport to="body">
+        <SysSprite v-if="phase === 'choose' && sysOn" mode="dock" />
+      </Teleport>
     </div>
 
     <footer class="stage-bottom">
-      <DialogueBox ref="dbRef" :text="phase === 'missed' ? missedSummary : dialogue" :tag="dialogueTag" />
+      <DialogueBox
+        v-if="phase !== 'choose'"
+        ref="dbRef"
+        :text="phase === 'missed' ? missedSummary : dialogue"
+        :tag="dialogueTag"
+      />
       <div v-if="phase === 'missed'" class="under">
         <button class="btn primary" @click.stop="advance">继续 ▸</button>
       </div>
