@@ -8,6 +8,11 @@ import ReportView from './views/ReportView.vue'
 import LettersView from './views/LettersView.vue'
 import ProfileView from './views/ProfileView.vue'
 import WorkView from './views/WorkView.vue'
+import SettingsView from './views/SettingsView.vue'
+import AccountView from './views/AccountView.vue'
+import SyncView from './views/SyncView.vue'
+import DocView from './views/DocView.vue'
+import AboutView from './views/AboutView.vue'
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -29,12 +34,21 @@ const router = createRouter({
     { path: '/report', component: ReportView },
     { path: '/letters', component: LettersView },
     { path: '/me', component: ProfileView },
+    // 设置（独立页面）：本人走 /settings，访客在自己沙箱路径下有同款（账号/同步/注销仅本人）
+    { path: '/settings', component: SettingsView },
+    { path: '/settings/account', component: AccountView },
+    { path: '/settings/sync', component: SyncView },
+    { path: '/settings/doc/:type(terms|privacy)', component: DocView },
+    { path: '/settings/about', component: AboutView },
     // 访客空间：全程关在 /w/:code 下——URL 永远标识作品，翻页可重新验权
     { path: '/w/:code', component: WorkView },
     { path: '/w/:code/stage', component: StageView },
     { path: '/w/:code/summary', redirect: (to) => `/w/${to.params.code}` },
     { path: '/w/:code/report', component: ReportView },
     { path: '/w/:code/editor', component: EditorView },
+    { path: '/w/:code/settings', component: SettingsView },
+    { path: '/w/:code/settings/doc/:type(terms|privacy)', component: DocView },
+    { path: '/w/:code/settings/about', component: AboutView },
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
 })
@@ -61,7 +75,12 @@ router.beforeEach(async (to) => {
   }
   if (guest.on) return `/w/${guest.work?.code ?? ''}`
   const { state } = useGame()
-  if (!state.started && !['/intro', '/editor', '/letters', '/me'].includes(to.path)) return '/intro'
+  if (
+    !state.started &&
+    !['/intro', '/editor', '/letters', '/me'].includes(to.path) &&
+    !to.path.startsWith('/settings')
+  )
+    return '/intro'
 })
 
 export default router

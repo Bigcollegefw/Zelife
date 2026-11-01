@@ -1,0 +1,138 @@
+/* ============ 皮肤 · 蜡笔杂货（crayon） ============
+   画风「蜡笔稚拙绘本」：四色纪律（奶油黄纸 / 牛仔蓝 / 纯黑 / 粉白）、大色块平涂、八值歪圆角。
+   加载顺序契约：必须在 main.css 之后引入（见 main.js import 顺序）。
+   机制：两块变量组（亮 / 暗）整组接管 main.css 同名变量；元件级覆盖一律带
+   :root[data-skin='crayon'] 前缀保特异性（组件 scoped 样式多为 0,2,0，这里 0,3,0 起步）。
+   经典皮肤（classic）不加载任何覆盖，天然保持原样。
+   首帧防闪在 index.html 内联脚本，色值三处同步：src/skin.js 的 SKINS[].bar ↔ 本文件 --bg ↔ 内联脚本。
+   2026-11-01 用户拍板：**不要描边**（断线贴片与面板边缘对不齐、虚线丑）——
+   蜡笔感只靠色板 + 歪圆角 + 大色块，任何元件不画装饰线，面板/卡片无框靠纸色与投影分层。 */
+
+:root[data-skin='crayon'] {
+  color-scheme: light;
+  --bg: #F8EFDB; /* 奶油黄纸 */
+  --paper: #FDF6EF; /* 粉白卡 */
+  --ink: #35302A; /* 蜡笔纯黑（暖调） */
+  --ink-2: #8B8069;
+  --ink-3: #B9AC90;
+  --line: #E5D6B4;
+  --mist: #F1E5C8;
+  --good: #5C8A6E;
+  --bad: #C0685A;
+  --tier-bad: #A85A4C;
+  --tier-sad: #97814F;
+  --tier-ok: #6F8A66;
+  --tier-good: #4E7D64;
+  --tier-great: #3F6B55;
+  --veil: rgba(253, 246, 239, 0.86);
+  --veil-soft: rgba(253, 246, 239, 0.55);
+  --on-ink: #FBF3DC; /* 牛仔蓝大色块上的奶油字 */
+  --ink-strong: #33527E; /* primary 按压加深一档（牛仔蓝深档，= --acc-strong） */
+  --outside: #EAE0C6;
+  --shadow: rgba(90, 74, 40, 0.14);
+  --pulse: rgba(53, 48, 42, 0.2);
+  --mask: rgba(38, 51, 79, 0.38);
+  --edge: #7E97C4;
+  /* 深底族：牛仔蓝深纸（过场 / 系统选项 / 气泡） */
+  --deep: #2A3A5C;
+  --deep-2: #3A5680;
+  --deep-glass: rgba(42, 58, 92, 0.94);
+  --on-deep: #F8EFDB;
+  /* 圆角族：八值 border-radius 简写 = 歪角（蜡笔形状语言，无线条） */
+  --r-btn: 14px 18px 12px 20px / 18px 12px 20px 14px;
+  --r-card: 16px 12px 18px 10px / 12px 18px 10px 16px;
+  --r-box: 14px 18px 12px 16px / 16px 12px 18px 14px;
+  --r-panel: 18px 14px 20px 12px / 14px 20px 12px 18px;
+  /* 皮肤私有变量 */
+  --acc: #3E6392; /* 牛仔蓝主色：primary / 选中态的大色块 */
+  --acc-strong: #33527E;
+}
+
+/* 暗档：深蓝纸 + 奶油字 + 亮一档的牛仔蓝 */
+:root[data-skin='crayon'][data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #26334F;
+  --paper: #2D3D5E;
+  --ink: #EFE7D2;
+  --ink-2: #9FABC4;
+  --ink-3: #6B7C9B;
+  --line: #3E4E71;
+  --mist: #354664;
+  --good: #7FAE94;
+  --bad: #D18A79;
+  --tier-bad: #C88A7C;
+  --tier-sad: #BFA172;
+  --tier-ok: #95AA92;
+  --tier-good: #7FABA2;
+  --tier-great: #6FA39B;
+  --veil: rgba(45, 61, 94, 0.88);
+  --veil-soft: rgba(45, 61, 94, 0.6);
+  --on-ink: #F6EDD8;
+  --ink-strong: #6C8FBE;
+  --outside: #1A2338;
+  --shadow: rgba(10, 18, 36, 0.4);
+  --pulse: rgba(239, 231, 210, 0.22);
+  --mask: rgba(8, 14, 28, 0.52);
+  --edge: #8FA7CE;
+  --deep: #1D2A45;
+  --deep-2: #2B4370;
+  --deep-glass: rgba(29, 42, 69, 0.94);
+  --on-deep: #F2E8D0;
+  --acc: #4E76A8;
+  --acc-strong: #6C8FBE;
+}
+
+/* ---- 大色块：primary / 选中态换牛仔蓝平涂（不加渐变，平色干净）。
+   按压加深走各组件既有的 var(--ink-strong)——本皮肤里它就是 --acc-strong，自动对齐 ---- */
+:root[data-skin='crayon'] .btn.primary { background: var(--acc); }
+:root[data-skin='crayon'] .sys-choice {
+  background: var(--acc);
+  border-color: var(--acc);
+  border-radius: var(--r-btn);
+}
+:root[data-skin='crayon'] .sys-choice:active { filter: brightness(1.2); }
+:root[data-skin='crayon'] .mode-switch button.on,
+:root[data-skin='crayon'] .theme-switch button.on,
+:root[data-skin='crayon'] .skin-switch button.on,
+:root[data-skin='crayon'] .set-seg button.on { background: var(--acc); }
+:root[data-skin='crayon'] .su-chip.on {
+  border-color: var(--acc);
+  background: var(--acc);
+}
+:root[data-skin='crayon'] .choice:not(:disabled):hover,
+:root[data-skin='crayon'] .choice:not(:disabled):focus-visible {
+  background: var(--acc);
+  border-color: var(--acc);
+}
+:root[data-skin='crayon'] .choice.picked {
+  background: var(--acc);
+  border-color: var(--acc);
+}
+:root[data-skin='crayon'] .cb-btn.go,
+:root[data-skin='crayon'] .ss-share-btn,
+:root[data-skin='crayon'] .sheet-i.primary,
+:root[data-skin='crayon'] .ev-sheet-i.primary { background: var(--acc); }
+:root[data-skin='crayon'] .rp-dots i.on { background-color: var(--acc); }
+
+/* ---- 面板与卡片：无框（用户拍板不要描边），靠纸色 / 毛玻璃 / 投影分层，只换歪圆角 ---- */
+:root[data-skin='crayon'] .sys,
+:root[data-skin='crayon'] .dbox:not(.bare) {
+  border: none;
+  border-radius: var(--r-panel);
+}
+:root[data-skin='crayon'] .card { border: none; border-radius: var(--r-card); }
+:root[data-skin='crayon'] .cb,
+:root[data-skin='crayon'] .ss-sheet,
+:root[data-skin='crayon'] .sd-panel { border: none; border-radius: var(--r-panel); }
+
+/* ---- 小件歪角：胶囊 / 浮标 / 回看坞小件（不画线，只造型） ---- */
+:root[data-skin='crayon'] .chip,
+:root[data-skin='crayon'] .delta-float,
+:root[data-skin='crayon'] .rp-where,
+:root[data-skin='crayon'] .rp-late,
+:root[data-skin='crayon'] .rp-dots,
+:root[data-skin='crayon'] .su-chip,
+:root[data-skin='crayon'] .cb-btn,
+:root[data-skin='crayon'] .ss-share-btn {
+  border-radius: 13px 15px 12px 16px / 15px 12px 16px 13px;
+}

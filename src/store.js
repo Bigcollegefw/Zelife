@@ -1,6 +1,7 @@
 import { computed, reactive, ref } from 'vue'
 import { BUILTIN_PRESETS } from './data/presets.js'
 import { STATE_START, MISSED_DELTA, applyDelta, clamp, stateTier } from './gloom.js'
+import { APP_NAME, TAGLINE } from './brand.js'
 
 const RUN_KEY = 'galplan-demo-v1'
 const PRESETS_KEY = 'galplan-presets-v1'
@@ -158,14 +159,14 @@ export function enterGuestWork(work, presetRaw) {
     date: null,
     log: [],
   })
-  document.title = `${work.title} · galplan`
+  document.title = `${work.title} · ${APP_NAME}`
 }
 
 /** 离开访客模式（访客页「退出」）：恢复本地数据源与页面标题 */
 export function exitGuest() {
   guest.on = false
   guest.work = null
-  document.title = 'galplan · 把一天过成一场游戏'
+  document.title = `${APP_NAME} · ${TAGLINE}`
 }
 
 const activePreset = computed(

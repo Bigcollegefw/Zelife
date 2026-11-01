@@ -13,7 +13,6 @@ import { drawerState } from '../drawer.js'
 import { confirmBox } from '../confirm.js'
 import GloomMeter from './GloomMeter.vue'
 import ModeSwitch from './ModeSwitch.vue'
-import ThemeSwitch from './ThemeSwitch.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -41,6 +40,12 @@ function onMe() {
   }
   close()
   router.push('/me')
+}
+
+/* 设置是独立页面：本人走 /settings，访客在自己的沙箱路径下也有同款页面 */
+function onSettings() {
+  close()
+  router.push(guest.on ? `/w/${guest.work?.code}/settings` : '/settings')
 }
 
 /* ---------- 今日块：原汇总页的时间轴 ---------- */
@@ -126,18 +131,20 @@ function leaveGuest() {
       <div v-if="drawerState.open" class="sd-mask" @click="close" @touchmove.self.prevent>
         <div class="sd-wrap">
           <aside class="sd-panel" @click.stop>
-            <button v-if="!guest.on" class="sd-me" @click="onMe">
-              <img v-if="hasAvatar" class="sd-ava" :src="avatarUrl" alt="" />
-              <span v-else class="sd-ava serif">{{ authState.user ? (authState.user.nickname || '玩')[0] : '客' }}</span>
-              <span class="sd-hi serif">{{ authState.user ? `hi，${authState.user.nickname}` : 'hi，点这里登录' }}</span>
-              <i class="sd-gear">⚙</i>
-            </button>
-            <div v-else class="sd-me sd-me-static">
-              <span class="sd-ava serif">客</span>
-              <span class="sd-mecol">
-                <span class="sd-hi serif">体验作品</span>
-                <span class="sd-worktitle">{{ guest.work?.title }}</span>
-              </span>
+            <div class="sd-me">
+              <button v-if="!guest.on" class="sd-me-main" @click="onMe">
+                <img v-if="hasAvatar" class="sd-ava" :src="avatarUrl" alt="" />
+                <span v-else class="sd-ava serif">{{ authState.user ? (authState.user.nickname || '玩')[0] : '客' }}</span>
+                <span class="sd-hi serif">{{ authState.user ? `hi，${authState.user.nickname}` : 'hi，点这里登录' }}</span>
+              </button>
+              <div v-else class="sd-me-main sd-me-static">
+                <span class="sd-ava serif">客</span>
+                <span class="sd-mecol">
+                  <span class="sd-hi serif">体验作品</span>
+                  <span class="sd-worktitle">{{ guest.work?.title }}</span>
+                </span>
+              </div>
+              <button class="sd-gear" aria-label="设置" @click="onSettings">⚙</button>
             </div>
 
             <!-- 今日（原汇总页内嵌） -->
@@ -211,11 +218,7 @@ function leaveGuest() {
               </button>
             </template>
 
-            <!-- 外观：显示偏好只存本机，与进度/账号无关，访客也能换 -->
-            <div class="sd-theme">
-              <i class="sd-theme-label serif">外观</i>
-              <ThemeSwitch />
-            </div>
+            <!-- 外观/语音/打字速度等偏好已收进设置弹层（顶行齿轮） -->
 
             <button v-if="guest.on" class="sd-leave" @click="leaveGuest">退出分享</button>
           </aside>
@@ -274,22 +277,30 @@ function leaveGuest() {
   transform: translateX(-100%);
 }
 
-/* ---- 顶行 ---- */
+/* ---- 顶行：主体（头像问候/铭牌）+ 齿轮设置键 ---- */
 .sd-me {
   display: flex;
   align-items: center;
   gap: 10px;
   width: 100%;
+  padding: 6px 2px 14px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+  flex: none;
+}
+.sd-me-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
   border: none;
   background: none;
   font: inherit;
   color: var(--ink);
-  padding: 6px 2px 14px;
-  margin-bottom: 6px;
-  border-bottom: 1px solid var(--line);
   cursor: pointer;
   text-align: left;
-  flex: none;
+  padding: 0;
   -webkit-tap-highlight-color: transparent;
 }
 .sd-me-static { cursor: default; }
@@ -313,12 +324,25 @@ function leaveGuest() {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* 齿轮：圆底大按键（手指友好 40px），点开设置弹层 */
 .sd-gear {
-  font-style: normal;
-  margin-left: auto;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--mist);
+  font: inherit;
+  font-size: 20px;
+  line-height: 1;
   color: var(--ink-2);
-  font-size: 15px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
+.sd-gear:active { background: var(--line); }
 .sd-mecol {
   display: flex;
   flex-direction: column;
@@ -510,23 +534,6 @@ function leaveGuest() {
   font-style: normal;
   color: var(--ink-3);
   font-size: 16px;
-}
-
-/* ---- 外观（显示偏好） ---- */
-.sd-theme {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-top: 18px;
-  padding-top: 14px;
-  border-top: 1px solid var(--line);
-}
-.sd-theme-label {
-  font-style: normal;
-  font-size: 14px;
-  letter-spacing: 0.2em;
-  color: var(--ink);
 }
 
 /* ---- 访客退出 ---- */

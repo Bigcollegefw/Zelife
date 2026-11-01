@@ -8,6 +8,7 @@ import { api } from '../api.js'
 import { useGame, enterGuestWork } from '../store.js'
 import { isMyWork, openShare } from '../share.js'
 import { openDrawer } from '../drawer.js'
+import { APP_NAME } from '../brand.js'
 
 const router = useRouter()
 const route = useRoute()
@@ -97,7 +98,7 @@ async function submitReport() {
 
     <div v-else class="w-body">
       <span class="mark" aria-hidden="true" />
-      <div class="w-kicker serif">galplan · 分享作品</div>
+      <div class="w-kicker serif">{{ APP_NAME }} · 分享作品</div>
       <h1 class="w-title serif">{{ info.title }}</h1>
       <p class="w-by">作者 {{ info.nickname }} · {{ meta }} · 演出进度不会保存</p>
       <button class="btn primary big" @click="begin">开始体验</button>

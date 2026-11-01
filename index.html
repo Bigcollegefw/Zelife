@@ -3,23 +3,32 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#FAF8F4" />
+    <meta name="theme-color" content="#F8EFDB" />
     <meta name="color-scheme" content="light" />
-    <!-- 首帧就用对主题（模块脚本来不及）：档位与色值同 src/theme.js -->
+    <!-- 首帧就用对皮肤×主题（模块脚本来不及）：键名/色值三处同步——src/skin.js 的 SKINS[].bar、
+         src/styles/skins/crayon.css 的 --bg、本段 BAR 表 -->
     <script>
       try {
+        var BAR = {
+          crayon: { light: '#F8EFDB', dark: '#26334F' },
+          classic: { light: '#FAF8F4', dark: '#201D18' },
+        }
+        var sk = localStorage.getItem('galplan-skin-v1') || 'crayon'
+        if (!BAR[sk]) sk = 'crayon'
+        document.documentElement.dataset.skin = sk
         var s = localStorage.getItem('galplan-theme-v1') || 'auto'
-        if (s === 'dark' || (s === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches)) {
+        var dark = s === 'dark' || (s === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches)
+        if (dark) {
           document.documentElement.dataset.theme = 'dark'
-          var m = document.querySelector('meta[name=theme-color]')
-          if (m) m.content = '#201D18'
           var c = document.querySelector('meta[name=color-scheme]')
           if (c) c.content = 'dark'
         }
+        var m = document.querySelector('meta[name=theme-color]')
+        if (m) m.content = BAR[sk][dark ? 'dark' : 'light']
       } catch (e) {}
     </script>
     <link rel="icon" href="data:," />
-    <title>galplan · 把一天过成一场游戏</title>
+    <title>择择人生 · 把一天过成一场游戏</title>
   </head>
   <body>
     <div id="app"></div>

@@ -1,0 +1,8 @@
+{
+  "model": "doubao-seedream-5-0-pro-260628",
+  "prompt": "贴纸风格Q版卡通小助手角色，单个角色居中全身立绘，简洁扁平插画，粗墨线描边，圆润可爱比例，暖奶油色配暖橙色配色，友好微笑表情，纯米白色纯色背景，无文字，无边框，无投影，无背景装饰，造型极简清晰，缩小后仍可辨认",
+  "size": "1024x1024",
+  "response_format": "url",
+  "output_format": "png",
+  "watermark": false
+}

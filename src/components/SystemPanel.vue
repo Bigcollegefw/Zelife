@@ -1,5 +1,6 @@
 <script setup>
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { setVoice, stopSpeak, speakSeq, voiceState } from '../tts.js'
 
 /**
  * 系统面板：决策时刻的「系统」演出（短剧风）。
@@ -14,8 +15,6 @@ const props = defineProps({
   speed: { type: Number, default: 42 }, // ms / 字
 })
 const emit = defineEmits(['choose'])
-
-const VOICE_KEY = 'galplan-sysvoice'
 
 const shown = ref('')
 const done = ref(false)
@@ -46,6 +45,7 @@ function dock() {
   if (docked.value) return
   docked.value = true
   play()
+  speakScript() // 开着语音就开读：旁白 → 选项。面板每个决策时刻重新挂载，停靠是唯一稳定的开口时机
 }
 onMounted(() => {
   flyTimer = setTimeout(dock, 950) // 与飞行动画时长一致
@@ -71,29 +71,20 @@ function isTyping() {
 }
 defineExpose({ skip, isTyping })
 
-/* ---------- TTS：浏览器内置中文语音 ---------- */
-const voiceOn = ref(false)
-try {
-  voiceOn.value = localStorage.getItem(VOICE_KEY) === '1'
-} catch { /* 隐私模式等：默认关 */ }
-
-function stopSpeak() {
-  try { window.speechSynthesis?.cancel() } catch { /* 无语音环境 */ }
+/* ---------- TTS：浏览器内置中文语音（短剧系统音），旁白 → 选项逐条连读 ----------
+   开关绑共享 voiceState（与设置弹层同源同键，改一处两处同步）；关掉时的安静由 setVoice 统一处理 */
+const CN_NUM = ['一', '二', '三', '四']
+/** 完整播报词：旁白 → 「选项一，……」……（选项的效果反馈到效果页由播报框读，这里不剧透） */
+function speakScript() {
+  speakSeq([
+    props.text,
+    ...props.choices.map((c, i) => `选项${CN_NUM[i] ?? i + 1}，${c.text}`),
+  ])
 }
-function speak(full) {
-  stopSpeak()
-  if (!voiceOn.value || !full) return
-  const u = new SpeechSynthesisUtterance(full)
-  u.lang = 'zh-CN'
-  u.rate = 1.05
-  try { window.speechSynthesis.speak(u) } catch { /* 无语音环境静默 */ }
-}
-watch(voiceOn, (on) => {
-  try { localStorage.setItem(VOICE_KEY, on ? '1' : '0') } catch { /* 忽略 */ }
-  if (on && docked.value) speak(props.text)
-  else stopSpeak()
+watch(() => voiceState.on, (on) => {
+  if (on && docked.value) speakScript()
 })
-watch(() => props.text, (t) => { if (docked.value) speak(t) })
+watch(() => props.text, () => { if (docked.value) speakScript() })
 
 /* ---------- 小人：墨色小系统（占位形象，后续可替换成生成的贴纸图） ---------- */
 </script>
@@ -106,9 +97,9 @@ watch(() => props.text, (t) => { if (docked.value) speak(t) })
       <span v-if="tag" class="sys-tag">{{ tag }}</span>
       <button
         class="sys-voice"
-        :title="voiceOn ? '关闭系统语音' : '开启系统语音'"
-        @click.stop="voiceOn = !voiceOn"
-      >{{ voiceOn ? '🔊' : '🔇' }}</button>
+        :title="voiceState.on ? '关闭系统语音' : '开启系统语音'"
+        @click.stop="setVoice(!voiceState.on)"
+      >{{ voiceState.on ? '🔊' : '🔇' }}</button>
     </div>
 
     <div class="sys-body">
@@ -143,7 +134,7 @@ watch(() => props.text, (t) => { if (docked.value) speak(t) })
   -webkit-backdrop-filter: blur(16px) saturate(1.05);
   backdrop-filter: blur(16px) saturate(1.05);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--r-panel);
   padding: 12px 16px 16px;
   box-shadow: 0 14px 40px var(--shadow);
   color: var(--ink);
@@ -253,8 +244,8 @@ watch(() => props.text, (t) => { if (docked.value) speak(t) })
   font-size: 14.5px;
   letter-spacing: 0.04em;
   color: var(--on-ink);
-  background: #3A342C;
-  border: 1px solid #3A342C;
+  background: var(--deep-2);
+  border: 1px solid var(--deep-2);
   border-radius: 8px;
   padding: 12px 14px;
   cursor: pointer;

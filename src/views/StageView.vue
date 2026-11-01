@@ -19,6 +19,8 @@ import SysSprite from '../components/SysSprite.vue'
 import SceneBackground from '../components/SceneBackground.vue'
 import TimingSheet from '../components/TimingSheet.vue'
 import { openDrawer } from '../drawer.js'
+import { typeSpeedMs } from '../prefs.js'
+import { notifyMoment } from '../notify.js'
 
 const router = useRouter()
 const { state, presets, activePreset, frontier, tier, isEnterable, choose, backfill, catchUp, patchScene, persistPresets, guest } =
@@ -257,7 +259,11 @@ onMounted(() => {
     now.value = nowMinutes()
     if (state.mode !== 'real' || phase.value !== 'waiting') return
     const wf = frontier.value
-    if (wf && isEnterable(wf, now.value)) beginScene(wf)
+    if (wf && isEnterable(wf, now.value)) {
+      // 到点时页面在后台：系统通知提醒（开关在设置 › 通知，能力边界见 notify.js）
+      if (document.hidden) notifyMoment(wf.time, wf.title)
+      beginScene(wf)
+    }
   }, 15000)
 })
 
@@ -369,9 +375,24 @@ watch(sysAuto, (v) => {
   clearTimeout(sysTimer)
   if (v) sysTimer = setTimeout(() => (sysOn.value = true), 600) // 到位后稍候半拍再飞入
 })
+
+/* ---------- 系统小人：舞台级常驻实例（选项 → 效果全程同一只，不随面板重挂） ----------
+   入场 = 召唤系统时（dock，跟着 sysOn 门控）；选择后只切 announce 模式
+   （小人原地起飞去播报位，SysSprite 内部处理连续飞行）；离开演出期
+   （翻篇到过场/等待/结局）才置 false，走自己的退场动画（spr-leave），与页面转场解耦 */
+const sprOn = ref(false)
+const sprMode = ref('dock')
+watch(sysOn, (v) => {
+  if (v && phase.value === 'choose') {
+    sprMode.value = 'dock'
+    sprOn.value = true
+  }
+})
 watch(phase, (p) => {
   clearTimeout(sysTimer)
   sysOn.value = false // 每个新时刻都重新走一遍「先看画面 → 再召唤」
+  if (p === 'effect') sprMode.value = 'announce' // 同一只小人切播报态（不重挂载）
+  else if (p !== 'choose') sprOn.value = false // 翻篇：小人独立退场
 })
 // 换节点 / 重进选择页 / 换了视频 → 重新等；切循环⇄定格（id 不变）不打断
 watch(
@@ -710,7 +731,7 @@ const deltaClass = computed(() =>
             ref="introDbRef"
             variant="bare"
             :text="introText"
-            :speed="42"
+            :speed="typeSpeedMs()"
             @done="introDone = true"
           />
         </template>
@@ -748,7 +769,7 @@ const deltaClass = computed(() =>
           ref="effectDbRef"
           variant="bare"
           :text="effectText"
-          :speed="38"
+          :speed="typeSpeedMs()"
           @done="effectDone = true"
         />
         <div class="in-tools two">
@@ -760,10 +781,6 @@ const deltaClass = computed(() =>
           >继续 ▸</button>
         </div>
         <div v-if="!effectDone && effectText" class="in-hint">轻触继续</div>
-        <!-- 系统小人：飞到屏幕中上方播报本次结算（Teleport 到 body，避免被效果页转场 transform 劫持定位） -->
-        <Teleport to="body">
-          <SysSprite v-if="effectChoice" mode="announce" :text="sysEffectText" />
-        </Teleport>
       </div>
     </transition>
 
@@ -775,16 +792,21 @@ const deltaClass = computed(() =>
           ref="dbRef"
           :tag="dialogueTag"
           :text="dialogue"
+          :speed="typeSpeedMs()"
           :choices="activeScene.choices"
           @choose="pick"
         />
       </transition>
-      <!-- 系统小人：独立飞行，绕屏一圈后落进面板头部。
-           Teleport 到 body：小人 position:fixed，若留在带 transform 的容器里会被当作包含块 → 位置飘移 -->
-      <Teleport to="body">
-        <SysSprite v-if="phase === 'choose' && sysOn" mode="dock" />
-      </Teleport>
     </div>
+
+    <!-- 系统小人：舞台级常驻实例——选项 → 效果全程同一只（选项期 dock 绕卡，选择后切 announce
+         原地起飞去播报位），只在翻篇时独立退场。Teleport 到 body：position:fixed
+         留在带 transform 的容器里会被劫持为包含块 → 位置飘移 -->
+    <Teleport to="body">
+      <transition name="spr">
+        <SysSprite v-if="sprOn" :mode="sprMode" :text="sysEffectText" />
+      </transition>
+    </Teleport>
 
     <footer class="stage-bottom">
       <DialogueBox
@@ -792,6 +814,7 @@ const deltaClass = computed(() =>
         ref="dbRef"
         :text="phase === 'missed' ? missedSummary : dialogue"
         :tag="dialogueTag"
+        :speed="typeSpeedMs()"
       />
       <div v-if="phase === 'missed'" class="under">
         <button class="btn primary" @click.stop="advance">继续 ▸</button>
@@ -816,7 +839,7 @@ const deltaClass = computed(() =>
               <ChoiceList :choices="rpChoices" :chosen="rpChosen" readonly />
             </div>
             <div class="rp-dialog">
-              <DialogueBox :key="'c' + rpPos" ref="rpDbRef" :text="rpNarr" :tag="rpTitle" />
+              <DialogueBox :key="'c' + rpPos" ref="rpDbRef" :text="rpNarr" :tag="rpTitle" :speed="typeSpeedMs()" />
             </div>
           </div>
         </template>
@@ -830,7 +853,7 @@ const deltaClass = computed(() =>
               <div class="in-title small">{{ rpTitle }}</div>
               <div v-if="rpStep.n > 1" class="in-count">引子 {{ rpStep.i + 1 }} / {{ rpStep.n }}</div>
             </div>
-            <DialogueBox :key="'i' + rpPos" ref="rpDbRef" variant="bare" :text="rpIntroText" :speed="42" />
+            <DialogueBox :key="'i' + rpPos" ref="rpDbRef" variant="bare" :text="rpIntroText" :speed="typeSpeedMs()" />
           </template>
           <template v-else>
             <div class="in-time serif">{{ rpTime }}</div>
@@ -845,7 +868,7 @@ const deltaClass = computed(() =>
           <div class="in-head">
             <div class="in-title small">「{{ rpChoiceText }}」</div>
           </div>
-          <DialogueBox v-if="rpEffectText" :key="'e' + rpPos" ref="rpDbRef" variant="bare" :text="rpEffectText" :speed="38" />
+          <DialogueBox v-if="rpEffectText" :key="'e' + rpPos" ref="rpDbRef" variant="bare" :text="rpEffectText" :speed="typeSpeedMs()" />
           <p class="rp-delta" :class="rpStep.e.delta > 0 ? 'good' : rpStep.e.delta < 0 ? 'bad' : 'zero'">
             状态 {{ fmtDelta(rpStep.e.delta) }}<template v-if="rpStep.e?.late">（顺流时已计入）</template>
           </p>
@@ -858,7 +881,7 @@ const deltaClass = computed(() =>
           <div class="in-time serif">{{ rpTime }}</div>
           <div class="in-line" />
           <div class="in-title serif">{{ rpTitle }}</div>
-          <DialogueBox :key="'m' + rpPos" ref="rpDbRef" variant="bare" :text="rpMissedText" :speed="38" />
+          <DialogueBox :key="'m' + rpPos" ref="rpDbRef" variant="bare" :text="rpMissedText" :speed="typeSpeedMs()" />
           <div v-if="rpCanPick" class="rp-backfill" @click.stop>
             <ChoiceList :choices="rpStep.node?.choices ?? []" @choose="rpBackfill" />
           </div>
@@ -870,7 +893,7 @@ const deltaClass = computed(() =>
           <SceneBackground v-if="rpMedia" :media="rpMedia" :bg-key="rpBgKey" :replay="'rp:' + rpPos" class="in-bg" />
           <div class="in-time serif">一日终了</div>
           <div class="in-line" />
-          <DialogueBox :key="'f' + rpPos" ref="rpDbRef" variant="bare" :text="rpFinaleText" :speed="38" />
+          <DialogueBox :key="'f' + rpPos" ref="rpDbRef" variant="bare" :text="rpFinaleText" :speed="typeSpeedMs()" />
         </div>
 
         <!-- 底部控制坞：进度、页签、按钮全部收在中下 -->
@@ -1031,7 +1054,7 @@ const deltaClass = computed(() =>
   position: absolute;
   inset: 0;
   z-index: 5;
-  background-color: #2B2823;
+  background-color: var(--deep);
   background-size: cover;
   background-position: center;
   display: flex;
@@ -1042,7 +1065,7 @@ const deltaClass = computed(() =>
   /* 底部预留按钮区（换背景/继续 + 提示），长文字居中也不会钻进去 */
   padding: 0 34px calc(104px + env(safe-area-inset-bottom));
   text-align: center;
-  color: #F5F1E8;
+  color: var(--on-deep);
 }
 .interlude.has-photo::before {
   content: '';
@@ -1097,7 +1120,7 @@ const deltaClass = computed(() =>
   inset: 0;
   z-index: 8;
   overflow: hidden;
-  background: #2B2823; /* 与过场底色一致：没配照片的画面不露底 */
+  background: var(--deep); /* 与过场底色一致：没配照片的画面不露底 */
   cursor: pointer;
   user-select: none;
   -webkit-user-select: none;
@@ -1241,4 +1264,10 @@ const deltaClass = computed(() =>
   gap: 12px;
 }
 .under { display: flex; justify-content: flex-end; }
+
+/* ---- 系统小人独立退场：翻篇时与页面转场解耦，小人自己飞走（入场由组件内的起飞动画负责） ---- */
+.spr-leave-active { animation: spr-leave 0.42s ease both; pointer-events: none; }
+@keyframes spr-leave {
+  to { transform: translateY(-44px) rotate(7deg) scale(0.85); opacity: 0; }
+}
 </style>

@@ -26,6 +26,17 @@
   --pulse: rgba(51, 48, 43, 0.18); /* 「现在」点标的脉冲起点 */
   --mask: rgba(28, 24, 18, 0.35); /* 弹层/抽屉外的压暗遮罩 */
   --edge: #A38D6A; /* 画布连线与箭头 */
+  /* 深底族：过场底 / 系统选项 / 播报气泡的深色纸。明暗主题同值（深底自成一体），
+     皮肤在 skins/*.css 里整组接管。原先散落的 #2B2823/#3A342C/rgba(42,37,31,.94)/#F5F1E8 归拢于此 */
+  --deep: #2B2823;
+  --deep-2: #3A342C;
+  --deep-glass: rgba(42, 37, 31, 0.94);
+  --on-deep: #F5F1E8;
+  /* 圆角族：元件圆角统一变量（皮肤可用八值 border-radius 简写整组换成歪角） */
+  --r-btn: 3px;
+  --r-card: 6px;
+  --r-box: 8px;
+  --r-panel: 10px;
   --serif: 'Songti SC', 'STSong', 'SimSun', 'Noto Serif SC', 'Source Han Serif SC', serif;
   --sans: 'YouYuan', '幼圆', 'Hiragino Sans GB', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
 }
@@ -88,7 +99,7 @@ body {
   letter-spacing: 0.14em;
   cursor: pointer;
   border: none;
-  border-radius: 3px;
+  border-radius: var(--r-btn);
   padding: 12px 24px;
   transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease, transform 0.1s ease;
 }
@@ -102,7 +113,7 @@ body {
 .card {
   background: var(--paper);
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--r-card);
   padding: 18px;
 }
 

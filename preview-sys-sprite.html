@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>预览：墨团小仙官（SysSprite 内置形象）</title>
+<style>
+  body { margin: 0; font-family: system-ui, sans-serif; display: flex; flex-wrap: wrap; }
+  .scene { flex: 1 1 320px; padding: 28px 24px 40px; }
+  .scene.day { --bg: #FAF8F4; --paper: #FFFFFF; --ink: #33302B; --ink-2: #8A8378; --ink-3: #BBB4A7; --on-ink: #FBFAF7; --bad: #AE6E62; background: var(--bg); color: var(--ink); }
+  .scene.night { --bg: #201D18; --paper: #2A251F; --ink: #E9E1D3; --ink-2: #A69C8B; --ink-3: #6E665A; --on-ink: #201D18; --bad: #CB9083; background: var(--bg); color: var(--ink); }
+  h2 { font-size: 14px; font-weight: 600; letter-spacing: 0.1em; margin: 0 0 20px; }
+  .row { display: flex; align-items: flex-end; gap: 28px; }
+  .cell { text-align: center; }
+  .cell small { display: block; margin-top: 8px; font-size: 11px; opacity: 0.65; }
+
+  /* ===== 与 SysSprite.vue 同步的角色样式（预览用快照） ===== */
+  .spr { color: var(--ink); filter: drop-shadow(0 4px 10px rgba(20, 18, 15, 0.28)); display: inline-block; }
+  .spr svg { width: 100%; height: auto; display: block; overflow: visible; }
+
+  .spr-halo-dial { fill: var(--paper); }
+  .spr-halo-ring { stroke: var(--ink-2); stroke-width: 1.3; }
+  .spr-halo-ticks line { stroke: var(--ink-3); stroke-width: 1; stroke-linecap: round; }
+  .spr-halo-gnomon { stroke: var(--ink); stroke-width: 1.6; stroke-linecap: round; }
+  .spr-halo-pin { fill: var(--ink-2); }
+  .spr-sheen { fill: #FFFFFF; opacity: 0.13; }
+  .spr-eye { fill: var(--on-ink); }
+  .spr-mouth { fill: none; stroke: var(--on-ink); stroke-width: 1.5; stroke-linecap: round; opacity: 0.9; }
+  .spr-blush { fill: var(--bad); opacity: 0.45; }
+  .spr-book { fill: var(--on-ink); }
+  .spr-book-line { stroke: var(--ink-2); stroke-width: 1; stroke-linecap: round; }
+  .spr-ribbon { fill: var(--bad); }
+
+  .spr-halo { transform-origin: 32px 7.5px; animation: halo-spin 9s linear infinite; }
+  @keyframes halo-spin { to { transform: rotate(360deg); } }
+  .spr-eyes { transform-origin: 32px 33.5px; animation: blink 4.4s steps(1) infinite; }
+  @keyframes blink { 0%, 94%, 100% { transform: scaleY(1); } 96% { transform: scaleY(0.12); } }
+  .s44 { width: 44px; } .s60 { width: 60px; } .s200 { width: 200px; }
+
+  /* ===== 蜡笔贴纸行（skins/crayon 放图即显示，没图整行隐藏） ===== */
+  .scene.crayon-day { --bg: #F8EFDB; --ink: #35302A; background: var(--bg); color: var(--ink); }
+  .scene.crayon-night { --bg: #26334F; --ink: #EFE7D2; background: var(--bg); color: var(--ink); }
+  .spr.sticker img { width: 100%; height: auto; display: block; }
+  .sticker-note { font-size: 11px; opacity: 0.6; margin-top: 14px; }
+</style>
+</head>
+<body>
+  <!-- 日 / 夜两个场景；SVG 与 SysSprite.vue 内置形象保持一致 -->
+  <template id="figure">
+    <svg viewBox="0 0 64 64" aria-hidden="true">
+      <g class="spr-halo">
+        <circle cx="32" cy="7.5" r="4.2" class="spr-halo-dial" />
+        <circle cx="32" cy="7.5" r="4.2" fill="none" class="spr-halo-ring" />
+        <g class="spr-halo-ticks">
+          <line x1="32" y1="4" x2="32" y2="5.1" />
+          <line x1="28.5" y1="7.5" x2="29.6" y2="7.5" />
+          <line x1="35.5" y1="7.5" x2="34.4" y2="7.5" />
+          <line x1="32" y1="11" x2="32" y2="9.9" />
+        </g>
+        <line x1="32" y1="7.5" x2="36.4" y2="4.5" class="spr-halo-gnomon" />
+        <circle cx="32" cy="7.5" r="1" class="spr-halo-pin" />
+      </g>
+      <ellipse cx="32" cy="38" rx="17.5" ry="19" fill="currentColor" />
+      <ellipse cx="26" cy="26.5" rx="8.5" ry="5.5" class="spr-sheen" transform="rotate(-14 26 26.5)" />
+      <g class="spr-eyes">
+        <ellipse cx="25.5" cy="33.5" rx="2.7" ry="3.4" class="spr-eye" />
+        <circle cx="26" cy="34.6" r="1.25" fill="currentColor" />
+        <circle cx="25.5" cy="34" r="0.62" class="spr-eye" />
+        <ellipse cx="38.5" cy="33.5" rx="2.7" ry="3.4" class="spr-eye" />
+        <circle cx="39" cy="34.6" r="1.25" fill="currentColor" />
+        <circle cx="38.5" cy="34" r="0.62" class="spr-eye" />
+      </g>
+      <path d="M29.5 40.6 Q32 42.9 34.5 40.6" class="spr-mouth" />
+      <ellipse cx="20.5" cy="38.5" rx="2.4" ry="1.5" class="spr-blush" />
+      <ellipse cx="43.5" cy="38.5" rx="2.4" ry="1.5" class="spr-blush" />
+      <g transform="rotate(-3 32 51)">
+        <rect x="23.5" y="45.5" width="17" height="11" rx="2" class="spr-book" />
+        <path d="M37.6 45.5 h2.2 v5.5 l-1.1 -1.6 l-1.1 1.6 Z" class="spr-ribbon" />
+        <line x1="26.5" y1="50.5" x2="36.5" y2="50.5" class="spr-book-line" />
+        <line x1="26.5" y1="53.2" x2="33.5" y2="53.2" class="spr-book-line" />
+        <circle cx="24.5" cy="46.6" r="2.4" fill="currentColor" />
+        <circle cx="39.5" cy="46.6" r="2.4" fill="currentColor" />
+      </g>
+    </svg>
+  </template>
+
+  <div class="scene day">
+    <h2>日间 · 墨团</h2>
+    <div class="row">
+      <div class="cell"><div class="spr s44"></div><small>44px 停靠态</small></div>
+      <div class="cell"><div class="spr s60"></div><small>60px 播报态</small></div>
+      <div class="cell"><div class="spr s200"></div><small>200px 细节</small></div>
+    </div>
+  </div>
+  <div class="scene night">
+    <h2>暖夜 · 奶油月光团</h2>
+    <div class="row">
+      <div class="cell"><div class="spr s44"></div><small>44px 停靠态</small></div>
+      <div class="cell"><div class="spr s60"></div><small>60px 播报态</small></div>
+      <div class="cell"><div class="spr s200"></div><small>200px 细节</small></div>
+    </div>
+  </div>
+
+  <div class="scene crayon-day">
+    <h2>蜡笔 · 奶油纸（crayon 亮档）</h2>
+    <div class="row" data-sticker>
+      <div class="cell"><div class="spr sticker s44"></div><small>44px 停靠态</small></div>
+      <div class="cell"><div class="spr sticker s60"></div><small>60px 播报态</small></div>
+      <div class="cell"><div class="spr sticker s200"></div><small>200px 细节</small></div>
+    </div>
+    <p class="sticker-note">贴纸行读 src/assets/skins/crayon/sprite.png（放图后刷新本页）</p>
+  </div>
+  <div class="scene crayon-night">
+    <h2>蜡笔 · 深蓝纸（crayon 暗档）</h2>
+    <div class="row" data-sticker>
+      <div class="cell"><div class="spr sticker s44"></div><small>44px 停靠态</small></div>
+      <div class="cell"><div class="spr sticker s60"></div><small>60px 播报态</small></div>
+      <div class="cell"><div class="spr sticker s200"></div><small>200px 细节</small></div>
+    </div>
+  </div>
+
+  <script>
+    // 把角色 SVG 克隆进 6 个格子里
+    const tpl = document.getElementById('figure')
+    document.querySelectorAll('.spr').forEach((box) => {
+      box.appendChild(tpl.content.cloneNode(true))
+    })
+    tpl.remove()
+
+    // 贴纸行：注入 <img>；没图则整块隐藏（file:// 下 onerror 也能触发）
+    document.querySelectorAll('.spr.sticker').forEach((box) => {
+      const img = new Image()
+      img.onerror = () => box.closest('.scene').remove()
+      img.alt = ''
+      box.appendChild(img)
+    })
+    Promise.all([...document.querySelectorAll('.spr.sticker img')].map(
+      (img) => new Promise((ok) => {
+        img.onload = img.onerror = ok
+        img.src = 'src/assets/skins/crayon/sprite.png'
+      }),
+    ))
+  </script>
+</body>
+</html>

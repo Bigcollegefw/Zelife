@@ -18,6 +18,7 @@ export async function onRequest({ request, env }) {
     if (pathname === '/api/auth/verify' && request.method === 'POST') return await handleVerify(env, request)
     if (pathname === '/api/me' && request.method === 'GET') return await handleMe(env, request)
     if (pathname === '/api/me' && request.method === 'PATCH') return await handleUpdateMe(env, request)
+    if (pathname === '/api/me' && request.method === 'DELETE') return await handleAccountDelete(env, request)
     if (pathname === '/api/me/avatar' && request.method === 'PUT') return await handleAvatarPut(env, request)
     if (pathname === '/api/me/avatar' && request.method === 'DELETE') return await handleAvatarDelete(env, request)
     const avMatch = /^\/api\/users\/([^/]+)\/avatar$/.exec(pathname)
@@ -257,6 +258,30 @@ async function handleLogout(env, request) {
   if (token) {
     await env.DB.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(await sha256Hex(token)).run()
   }
+  return json({ ok: true })
+}
+
+/* 注销账号（本人，设置 › 账号与协议）：删干净云端痕迹——
+   全部分享作品（行 + R2 媒体）、全部会话、验证码记录、账号行（头像随行删）。
+   本机数据（浏览器存储）不归服务端管，前端注销成功后自行处理登录态。
+   与 handleWorkDelete 同款 R2 清理（前缀分页删）。 */
+async function handleAccountDelete(env, request) {
+  const auth = await requireUser(env, request)
+  if (!auth) return json({ error: '登录已过期，请重新登录' }, 401)
+  const uid = auth.row.id
+  const { results: works } = await env.DB.prepare('SELECT code FROM works WHERE owner_id = ?').bind(uid).all()
+  for (const w of works) {
+    let cursor
+    do {
+      const list = await env.MEDIA.list({ prefix: `${w.code}/`, cursor })
+      if (list.objects.length) await env.MEDIA.delete(list.objects.map((o) => o.key))
+      cursor = list.truncated ? list.cursor : undefined
+    } while (cursor)
+  }
+  if (works.length) await env.DB.prepare('DELETE FROM works WHERE owner_id = ?').bind(uid).run()
+  await env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(uid).run()
+  await env.DB.prepare('DELETE FROM auth_codes WHERE email = ?').bind(auth.row.email).run()
+  await env.DB.prepare('DELETE FROM users WHERE id = ?').bind(uid).run()
   return json({ ok: true })
 }
 

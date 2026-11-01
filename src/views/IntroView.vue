@@ -3,6 +3,7 @@ import { useRouter } from 'vue-router'
 import { useGame } from '../store.js'
 import { openDrawer } from '../drawer.js'
 import { confirmBox } from '../confirm.js'
+import { APP_NAME, WORDMARK } from '../brand.js'
 import ModeSwitch from '../components/ModeSwitch.vue'
 
 const router = useRouter()
@@ -26,7 +27,8 @@ async function pickPreset(p) {
     <button class="intro-menu" aria-label="菜单" @click="openDrawer()">☰</button>
     <div class="intro-core">
       <span class="mark" aria-hidden="true" />
-      <div class="wordmark serif">galplan</div>
+      <img v-if="WORDMARK" class="wordmark-img" :src="WORDMARK" :alt="APP_NAME" />
+      <div v-else class="wordmark serif">{{ APP_NAME }}</div>
       <p class="tagline serif">把一天，过成一场<br />可以选择的游戏。</p>
 
       <ul class="intro-list">
@@ -109,6 +111,8 @@ async function pickPreset(p) {
   margin-bottom: 14px;
 }
 .wordmark { font-size: 15px; letter-spacing: 0.5em; text-indent: 0.5em; color: var(--ink-2); }
+/* 字标图（assets/brand/wordmark.png 放图即启用）：横版等比，宽度贴页面排版 */
+.wordmark-img { width: min(180px, 50%); margin-bottom: 2px; }
 .tagline {
   font-size: 26px;
   line-height: 1.8;

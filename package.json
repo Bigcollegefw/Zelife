@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "api": "wrangler pages dev --port=8787",
-    "db:init": "wrangler d1 execute DB --local --file schema.sql"
+    "db:init": "wrangler d1 execute DB --local --file schema.sql",
+    "assets": "node tools/gen-assets.mjs"
   },
   "dependencies": {
     "vue": "^3.5.13",
@@ -16,6 +17,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.2.1",
+    "sharp": "^0.35.5",
     "vite": "^6.3.5",
     "wrangler": "4.85.0"
   }

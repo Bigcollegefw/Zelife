@@ -33,8 +33,7 @@ async function run(mode, fn) {
 
 const uid = () => `m_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
 
-export async function putMedia(blob) {
-  const id = uid()
+export async function putMedia(blob, id = uid()) {
   await run('readwrite', (s) => s.put(blob, id))
   return id
 }
